@@ -47,6 +47,8 @@ async function getKeys(): Promise<{ claudeKey: string; elevenLabsKey: string }> 
   const elevenLabsKey: string = (result.elevenLabsKey as string | undefined)
     || import.meta.env.VITE_ELEVENLABS_API_KEY
     || "";
+  log("Keys resolved — claude:", claudeKey ? `set (${claudeKey.slice(0, 10)}...)` : "MISSING",
+    "| elevenlabs:", elevenLabsKey ? `set (${elevenLabsKey.slice(0, 8)}...)` : "MISSING");
   return { claudeKey, elevenLabsKey };
 }
 
@@ -67,7 +69,7 @@ async function injectContentScriptIfNeeded(tabId: number): Promise<void> {
 async function buildNarrationText(page: ExtractedPage, claudeKey: string): Promise<string> {
   log("Claude: building narration text for", `"${page.title}"`, `(${page.content.length} chars)`);
   if (!claudeKey) err("Claude API key is not set");
-  const client = new Anthropic({ apiKey: claudeKey });
+  const client = new Anthropic({ apiKey: claudeKey, dangerouslyAllowBrowser: true });
   const msg = await client.messages.create({
     model: "claude-sonnet-4-6",
     max_tokens: 4096,
@@ -116,7 +118,7 @@ async function chatWithClaude(
 ): Promise<string> {
   log("Claude: chat request", `(history: ${history.length} turns, page: "${page.title}")`);
   if (!claudeKey) err("Claude API key is not set");
-  const client = new Anthropic({ apiKey: claudeKey });
+  const client = new Anthropic({ apiKey: claudeKey, dangerouslyAllowBrowser: true });
   const msg = await client.messages.create({
     model: "claude-sonnet-4-6",
     max_tokens: 1024,
