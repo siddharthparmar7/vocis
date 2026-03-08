@@ -5,24 +5,33 @@ export function useChat(page: ExtractedPage | null) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [loading, setLoading] = useState(false);
   const audioRef = useRef<HTMLAudioElement | null>(null);
+  const inFlightRef = useRef(false);
 
   const send = useCallback(async (userText: string, voice: string) => {
-    if (!page || !userText.trim()) return;
+    if (!page || !userText.trim() || inFlightRef.current) return;
 
+    inFlightRef.current = true;
     const userMessage: ChatMessage = { role: "user", content: userText };
-    const nextHistory = [...messages, userMessage];
-    setMessages(nextHistory);
+
+    // Use functional updater to always get latest state
+    let currentHistory: ChatMessage[] = [];
+    setMessages((prev) => {
+      currentHistory = prev;
+      return [...prev, userMessage];
+    });
+
     setLoading(true);
 
     const response = await chrome.runtime.sendMessage({
       type: "CHAT",
       page,
-      history: messages,
+      history: currentHistory,
       userMessage: userText,
       voice,
     });
 
     setLoading(false);
+    inFlightRef.current = false;
 
     if (!response?.success) {
       console.error("Chat failed:", response?.error);
@@ -30,7 +39,7 @@ export function useChat(page: ExtractedPage | null) {
     }
 
     const { text, audioBuffer } = response.data as { text: string; audioBuffer: ArrayBuffer };
-    setMessages([...nextHistory, { role: "assistant", content: text }]);
+    setMessages((prev) => [...prev, { role: "assistant", content: text }]);
 
     // Play reply audio
     audioRef.current?.pause();
@@ -39,8 +48,13 @@ export function useChat(page: ExtractedPage | null) {
     const audio = new Audio(url);
     audioRef.current = audio;
     audio.addEventListener("ended", () => URL.revokeObjectURL(url));
-    audio.play();
-  }, [page, messages]);
+    try {
+      await audio.play();
+    } catch {
+      URL.revokeObjectURL(url);
+      audioRef.current = null;
+    }
+  }, [page]);
 
   return { messages, send, loading };
 }

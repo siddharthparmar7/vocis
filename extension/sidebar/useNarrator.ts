@@ -39,8 +39,15 @@ export function useNarrator() {
       setState("IDLE");
     });
 
-    audio.play();
-    setState("PLAYING");
+    try {
+      await audio.play();
+      setState("PLAYING");
+    } catch {
+      URL.revokeObjectURL(url);
+      audioRef.current = null;
+      setState("IDLE");
+      console.error("Audio playback blocked or failed");
+    }
   }, [stop]);
 
   const pause = useCallback(() => {
