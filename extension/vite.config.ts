@@ -7,7 +7,7 @@ export default defineConfig({
     react(),
     webExtension({
       manifest: "manifest.json",
-      additionalInputs: ["sidebar/index.html"],
+      additionalInputs: ["sidebar/index.html", "content-script.ts"],
     }),
   ],
 });
