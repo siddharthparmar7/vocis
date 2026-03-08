@@ -19,7 +19,7 @@ After code changes, click the refresh icon on the extension card in `chrome://ex
 Three layers with strict separation:
 
 ```
-content-script.ts   — injected on demand, extracts page text via Readability.js
+content-script.ts   — injected on demand, extracts visible page text via IntersectionObserver
 background.ts       — service worker, ONLY file that calls Claude + ElevenLabs APIs
 sidebar/            — React UI, communicates with background via chrome.runtime.sendMessage
 ```
@@ -35,7 +35,7 @@ sidebar/            — React UI, communicates with background via chrome.runtim
 ```
 manifest.json           MV3 config — permissions, side panel, action
 background.ts           Service worker: message router, Claude + ElevenLabs calls
-content-script.ts       Readability.js extraction, responds to EXTRACT_CONTENT
+content-script.ts       IntersectionObserver extraction of visible elements, responds to EXTRACT_CONTENT and PING
 types.ts                Shared types: ExtractedPage, ChatMessage, MessageRequest
 vite.config.ts          Build config (vite-plugin-web-extension)
 tailwind.config.js      Tailwind v3, scoped to sidebar/**
@@ -86,6 +86,7 @@ All logs are prefixed for easy filtering:
 - **Service worker lifetime**: MV3 workers can be killed after ~30s idle. Long narrations use a keepalive (`chrome.storage` ping every 20s) to prevent this.
 - **Content script injection**: Not declared statically in manifest — injected on demand. This means it only runs when the sidebar is open, not on every page load.
 - **ElevenLabs SDK**: The `elevenlabs` npm package is deprecated in favour of `@elevenlabs/elevenlabs-js` but still functional. `client.textToSpeech.convert()` returns a Node `stream.Readable` type but in the browser runtime it's a Web `ReadableStream` — cast to `AsyncIterable<Uint8Array>` to consume it.
+- **SPA support**: `content-script.ts` observer does not watch dynamically inserted elements (SPAs); re-injecting the script resets the observer.
 
 ## Out of Scope (v1)
 

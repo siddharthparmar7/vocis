@@ -21,12 +21,9 @@ const observer = new IntersectionObserver(
 );
 
 // Observe all matching elements currently in the DOM
-document.querySelectorAll(CONTENT_SELECTORS).forEach((el) => observer.observe(el));
-log(
-  "IntersectionObserver registered on",
-  document.querySelectorAll(CONTENT_SELECTORS).length,
-  "elements"
-);
+const targets = document.querySelectorAll(CONTENT_SELECTORS);
+targets.forEach((el) => observer.observe(el));
+log("IntersectionObserver registered on", targets.length, "elements");
 
 function extractContent(): { title: string; content: string; readTimeMinutes: number } {
   log("Extracting viewport content from", document.location.href);
@@ -60,6 +57,10 @@ function extractContent(): { title: string; content: string; readTimeMinutes: nu
 }
 
 chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
+  if (message.type === "PING") {
+    sendResponse({});
+    return false;
+  }
   if (message.type === "EXTRACT_CONTENT") {
     try {
       sendResponse({ success: true, data: extractContent() });
