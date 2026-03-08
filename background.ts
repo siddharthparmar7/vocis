@@ -27,6 +27,13 @@ const PRESET_VOICES = [
   { id: "TxGEqnHWrfWFTfGW9XjX", name: "Josh" },
 ];
 
+// Open the side panel when the extension icon is clicked
+chrome.action.onClicked.addListener((tab) => {
+  if (tab.id) {
+    chrome.sidePanel.open({ tabId: tab.id });
+  }
+});
+
 async function getKeys(): Promise<{ claudeKey: string; elevenLabsKey: string }> {
   const result = await chrome.storage.local.get(["claudeKey", "elevenLabsKey"]);
   const claudeKey: string = (result.claudeKey as string | undefined) ?? "";
