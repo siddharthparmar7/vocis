@@ -6,7 +6,9 @@ const log = (...args: unknown[]) => console.log("[AI Narrator:chat]", ...args);
 export function useChat(page: ExtractedPage | null) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [loading, setLoading] = useState(false);
+  const [isPlaying, setIsPlaying] = useState(false);
   const audioCtxRef = useRef<AudioContext | null>(null);
+  const sourceRef = useRef<AudioBufferSourceNode | null>(null);
   const inFlightRef = useRef(false);
 
   function getOrCreateCtx(): AudioContext {
@@ -16,13 +18,23 @@ export function useChat(page: ExtractedPage | null) {
     return audioCtxRef.current;
   }
 
-  const send = useCallback(async (userText: string, voice: string) => {
+  const stopAudio = useCallback(() => {
+    if (sourceRef.current) {
+      sourceRef.current.onended = null;
+      try { sourceRef.current.stop(); } catch { /* already stopped */ }
+      sourceRef.current.disconnect();
+      sourceRef.current = null;
+    }
+    setIsPlaying(false);
+  }, []);
+
+  const send = useCallback(async (userText: string, voice: string, voiceReply: boolean) => {
     if (!page || !userText.trim() || inFlightRef.current) {
       if (inFlightRef.current) log("send() blocked — request already in flight");
       return;
     }
 
-    log("send():", `"${userText}"`);
+    log("send():", `"${userText}"`, "voiceReply:", voiceReply);
     inFlightRef.current = true;
     const userMessage: ChatMessage = { role: "user", content: userText };
 
@@ -45,6 +57,7 @@ export function useChat(page: ExtractedPage | null) {
       history: currentHistory,
       userMessage: userText,
       voice,
+      voiceReply,
     });
 
     setLoading(false);
@@ -55,9 +68,11 @@ export function useChat(page: ExtractedPage | null) {
       return;
     }
 
-    const { text, audioBase64 } = response.data as { text: string; audioBase64: string };
+    const { text, audioBase64 } = response.data as { text: string; audioBase64: string | null };
     log("Response received:", `"${text.slice(0, 80)}${text.length > 80 ? "…" : ""}"`);
     setMessages((prev) => [...prev, { role: "assistant", content: text }]);
+
+    if (!audioBase64) return;
 
     // Play reply via AudioContext (immune to autoplay policy after ctx.resume() above)
     try {
@@ -68,12 +83,21 @@ export function useChat(page: ExtractedPage | null) {
       const source = ctx.createBufferSource();
       source.buffer = decodedBuffer;
       source.connect(ctx.destination);
+      source.onended = () => {
+        if (sourceRef.current === source) {
+          sourceRef.current = null;
+          setIsPlaying(false);
+          log("Chat audio ended naturally");
+        }
+      };
       source.start(0);
+      sourceRef.current = source;
+      setIsPlaying(true);
       log("Playing audio response");
     } catch (e) {
       console.error("[AI Narrator:chat] Audio playback failed:", e);
     }
-  }, [page]);
+  }, [page, stopAudio]);
 
-  return { messages, send, loading };
+  return { messages, send, loading, isPlaying, stopAudio };
 }
