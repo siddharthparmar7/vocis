@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import type { ExtractedPage } from "../types";
 import { useChat } from "./useChat";
 
@@ -40,6 +40,11 @@ export function ChatPanel({ page, voice }: Props) {
   const [input, setInput] = useState("");
   const [listening, setListening] = useState(false);
   const recogRef = useRef<ISpeechRecognition | null>(null);
+  const bottomRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages, loading]);
 
   function startListening() {
     const Ctor = window.SpeechRecognition ?? window.webkitSpeechRecognition;
@@ -89,6 +94,7 @@ export function ChatPanel({ page, voice }: Props) {
             Thinking…
           </div>
         )}
+        <div ref={bottomRef} />
       </div>
 
       <div className="border-t p-2 flex gap-2">
