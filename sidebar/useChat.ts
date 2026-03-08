@@ -28,7 +28,7 @@ export function useChat(page: ExtractedPage | null) {
     setIsPlaying(false);
   }, []);
 
-  const send = useCallback(async (userText: string, voice: string, voiceReply: boolean) => {
+  const send = useCallback(async (userText: string, voice: string, voiceReply = true) => {
     if (!page || !userText.trim() || inFlightRef.current) {
       if (inFlightRef.current) log("send() blocked — request already in flight");
       return;
