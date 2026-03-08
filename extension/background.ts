@@ -2,6 +2,22 @@ import Anthropic from "@anthropic-ai/sdk";
 import { ElevenLabsClient } from "elevenlabs";
 import type { MessageRequest, ExtractedPage, ChatMessage } from "./types";
 
+/**
+ * Keeps the service worker alive during long async operations by periodically
+ * touching chrome.storage (which resets Chrome's idle timer).
+ * Necessary for MV3 service workers where Claude + ElevenLabs latency can exceed 30s.
+ */
+async function withKeepalive<T>(fn: () => Promise<T>): Promise<T> {
+  const interval = setInterval(() => {
+    chrome.storage.local.get("_keepalive").catch(() => {});
+  }, 20000);
+  try {
+    return await fn();
+  } finally {
+    clearInterval(interval);
+  }
+}
+
 const PRESET_VOICES = [
   { id: "21m00Tcm4TlvDq8ikWAM", name: "Rachel" },
   { id: "AZnzlk1XvdvUeBnXmlld", name: "Domi" },
@@ -101,13 +117,18 @@ chrome.runtime.onMessage.addListener((message: MessageRequest, _sender, sendResp
         sendResponse(result);
 
       } else if (message.type === "NARRATE") {
-        const narrationText = await buildNarrationText(message.page, claudeKey);
-        const audioBuffer = await synthesizeSpeech(narrationText, message.voice, elevenLabsKey);
+        const audioBuffer = await withKeepalive(async () => {
+          const narrationText = await buildNarrationText(message.page, claudeKey);
+          return synthesizeSpeech(narrationText, message.voice, elevenLabsKey);
+        });
         sendResponse({ success: true, data: { audioBuffer } });
 
       } else if (message.type === "CHAT") {
-        const reply = await chatWithClaude(message.page, message.history, message.userMessage, claudeKey);
-        const audioBuffer = await synthesizeSpeech(reply, message.voice, elevenLabsKey);
+        const { text: reply, audioBuffer } = await withKeepalive(async () => {
+          const text = await chatWithClaude(message.page, message.history, message.userMessage, claudeKey);
+          const audioBuffer = await synthesizeSpeech(text, message.voice, elevenLabsKey);
+          return { text, audioBuffer };
+        });
         sendResponse({ success: true, data: { text: reply, audioBuffer } });
 
       } else if (message.type === "GET_VOICES") {
