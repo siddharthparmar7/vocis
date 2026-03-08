@@ -73,10 +73,12 @@ export function useNarrator() {
       return;
     }
 
-    const rawBuffer: ArrayBuffer = response.data.audioBuffer;
+    const binary = atob(response.data.audioBase64 as string);
+    const rawBuffer = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i++) rawBuffer[i] = binary.charCodeAt(i);
     log("Audio buffer received:", `${(rawBuffer.byteLength / 1024).toFixed(1)} kB`);
 
-    const audioBuffer = await ctx.decodeAudioData(rawBuffer);
+    const audioBuffer = await ctx.decodeAudioData(rawBuffer.buffer);
     audioBufferRef.current = audioBuffer;
 
     startSource(ctx, audioBuffer, 0);

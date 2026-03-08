@@ -55,13 +55,16 @@ export function useChat(page: ExtractedPage | null) {
       return;
     }
 
-    const { text, audioBuffer } = response.data as { text: string; audioBuffer: ArrayBuffer };
+    const { text, audioBase64 } = response.data as { text: string; audioBase64: string };
     log("Response received:", `"${text.slice(0, 80)}${text.length > 80 ? "…" : ""}"`);
     setMessages((prev) => [...prev, { role: "assistant", content: text }]);
 
     // Play reply via AudioContext (immune to autoplay policy after ctx.resume() above)
     try {
-      const decodedBuffer = await ctx.decodeAudioData(audioBuffer);
+      const binary = atob(audioBase64);
+      const rawBuffer = new Uint8Array(binary.length);
+      for (let i = 0; i < binary.length; i++) rawBuffer[i] = binary.charCodeAt(i);
+      const decodedBuffer = await ctx.decodeAudioData(rawBuffer.buffer);
       const source = ctx.createBufferSource();
       source.buffer = decodedBuffer;
       source.connect(ctx.destination);

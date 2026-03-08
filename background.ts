@@ -82,7 +82,7 @@ async function buildNarrationText(page: ExtractedPage, claudeKey: string): Promi
   return text;
 }
 
-async function synthesizeSpeech(text: string, voiceId: string, elevenLabsKey: string): Promise<ArrayBuffer> {
+async function synthesizeSpeech(text: string, voiceId: string, elevenLabsKey: string): Promise<string> {
   log("ElevenLabs: synthesizing speech", `(voice: ${voiceId}, ${text.length} chars)`);
   if (!elevenLabsKey) err("ElevenLabs API key is not set");
   const client = new ElevenLabsClient({ apiKey: elevenLabsKey });
@@ -107,8 +107,13 @@ async function synthesizeSpeech(text: string, voiceId: string, elevenLabsKey: st
     offset += chunk.length;
   }
   log("ElevenLabs: audio ready", `(${(total / 1024).toFixed(1)} kB)`);
-  return merged.buffer;
+  // Convert to base64 — chrome.runtime.sendMessage cannot transfer ArrayBuffers
+  // (they serialize as empty objects). Base64 string survives the message channel intact.
+  let binary = "";
+  for (let i = 0; i < merged.length; i++) binary += String.fromCharCode(merged[i]);
+  return btoa(binary);
 }
+
 
 async function chatWithClaude(
   page: ExtractedPage,
@@ -159,7 +164,7 @@ chrome.runtime.onMessage.addListener((message: MessageRequest, _sender, sendResp
           return synthesizeSpeech(narrationText, message.voice, elevenLabsKey);
         });
         log("Narrate: complete");
-        sendResponse({ success: true, data: { audioBuffer } });
+        sendResponse({ success: true, data: { audioBase64: audioBuffer } });
 
       } else if (message.type === "CHAT") {
         log("Chat: user message:", `"${message.userMessage}"`);
@@ -169,7 +174,7 @@ chrome.runtime.onMessage.addListener((message: MessageRequest, _sender, sendResp
           return { text, audioBuffer };
         });
         log("Chat: response sent");
-        sendResponse({ success: true, data: { text: reply, audioBuffer } });
+        sendResponse({ success: true, data: { text: reply, audioBase64: audioBuffer } });
 
       } else if (message.type === "GET_VOICES") {
         log("Returning", PRESET_VOICES.length, "preset voices");
