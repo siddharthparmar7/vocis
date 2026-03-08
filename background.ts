@@ -167,14 +167,15 @@ chrome.runtime.onMessage.addListener((message: MessageRequest, _sender, sendResp
         sendResponse({ success: true, data: { audioBase64: audioBuffer } });
 
       } else if (message.type === "CHAT") {
-        log("Chat: user message:", `"${message.userMessage}"`);
-        const { text: reply, audioBuffer } = await withKeepalive(async () => {
+        log("Chat: user message:", `"${message.userMessage}"`, "voiceReply:", message.voiceReply);
+        const { text: reply, audioBase64 } = await withKeepalive(async () => {
           const text = await chatWithClaude(message.page, message.history, message.userMessage, claudeKey);
-          const audioBuffer = await synthesizeSpeech(text, message.voice, elevenLabsKey);
-          return { text, audioBuffer };
+          if (!message.voiceReply) return { text, audioBase64: null };
+          const audioBase64 = await synthesizeSpeech(text, message.voice, elevenLabsKey);
+          return { text, audioBase64 };
         });
         log("Chat: response sent");
-        sendResponse({ success: true, data: { text: reply, audioBase64: audioBuffer } });
+        sendResponse({ success: true, data: { text: reply, audioBase64 } });
 
       } else if (message.type === "GET_VOICES") {
         log("Returning", PRESET_VOICES.length, "preset voices");
