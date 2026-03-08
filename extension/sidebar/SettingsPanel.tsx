@@ -1,14 +1,19 @@
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 
 export function SettingsPanel({ onClose }: { onClose: () => void }) {
   const [claudeKey, setClaudeKey] = useState("");
   const [elevenLabsKey, setElevenLabsKey] = useState("");
   const [saved, setSaved] = useState(false);
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    return () => { if (timerRef.current) clearTimeout(timerRef.current); };
+  }, []);
 
   async function handleSave() {
     await chrome.runtime.sendMessage({ type: "SET_KEYS", claudeKey, elevenLabsKey });
     setSaved(true);
-    setTimeout(() => { setSaved(false); onClose(); }, 1000);
+    timerRef.current = setTimeout(() => { setSaved(false); onClose(); }, 1000);
   }
 
   return (

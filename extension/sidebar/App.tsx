@@ -13,7 +13,7 @@ export function App() {
 
   useEffect(() => {
     chrome.storage.sync.get(["selectedVoice"]).then((result) => {
-      if (result.selectedVoice) setVoice(result.selectedVoice as string);
+      if (typeof result.selectedVoice === "string") setVoice(result.selectedVoice);
     });
   }, []);
 
