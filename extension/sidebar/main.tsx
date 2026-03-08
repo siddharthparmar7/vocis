@@ -1,3 +1,10 @@
+import React from "react";
+import ReactDOM from "react-dom/client";
 import "./index.css";
-// Placeholder - will be replaced in Task 9
-export {};
+import { App } from "./App";
+
+ReactDOM.createRoot(document.getElementById("root")!).render(
+  <React.StrictMode>
+    <App />
+  </React.StrictMode>
+);
