@@ -1,39 +1,54 @@
-import { Readability } from "@mozilla/readability";
-
 const log = (...args: unknown[]) => console.log("[AI Narrator:content]", ...args);
 const err = (...args: unknown[]) => console.error("[AI Narrator:content]", ...args);
 
+// Block-level elements whose text represents readable content
+const CONTENT_SELECTORS = "p, h1, h2, h3, h4, h5, h6, li, blockquote, td";
+
+// Live set of elements currently intersecting the viewport
+const visibleElements = new Set<Element>();
+
+const observer = new IntersectionObserver(
+  (entries) => {
+    for (const entry of entries) {
+      if (entry.isIntersecting) {
+        visibleElements.add(entry.target);
+      } else {
+        visibleElements.delete(entry.target);
+      }
+    }
+  },
+  { threshold: 0 }
+);
+
+// Observe all matching elements currently in the DOM
+document.querySelectorAll(CONTENT_SELECTORS).forEach((el) => observer.observe(el));
+log(
+  "IntersectionObserver registered on",
+  document.querySelectorAll(CONTENT_SELECTORS).length,
+  "elements"
+);
+
 function extractContent(): { title: string; content: string; readTimeMinutes: number } {
-  log("Extracting page content from", document.location.href);
+  log("Extracting viewport content from", document.location.href);
 
-  // Run Readability on a clone to identify the article area
-  const documentClone = document.cloneNode(true) as Document;
-  const reader = new Readability(documentClone);
-  const article = reader.parse();
-
-  const title = article?.title ?? document.title;
-
+  const title = document.title;
   let content = "";
 
-  if (article?.content) {
-    // Parse Readability's cleaned HTML and read innerText — this gives only
-    // what is visually rendered (respects display:none, skips hidden metadata).
-    const div = document.createElement("div");
-    div.innerHTML = article.content;
-    content = div.innerText.trim();
-    log("Used Readability + innerText extraction");
+  if (visibleElements.size > 0) {
+    // Re-query to get stable DOM order, then filter to visible set
+    const allElements = Array.from(document.querySelectorAll(CONTENT_SELECTORS));
+    const ordered = allElements.filter((el) => visibleElements.has(el));
+    content = ordered
+      .map((el) => (el as HTMLElement).innerText.trim())
+      .filter(Boolean)
+      .join("\n");
+    log("IntersectionObserver: extracted from", ordered.length, "visible elements");
   }
 
   if (!content) {
-    // Fallback: find the best visible content container on the real DOM
-    const mainEl = (
-      document.querySelector("main") ||
-      document.querySelector("article") ||
-      document.querySelector("[role='main']") ||
-      document.body
-    ) as HTMLElement;
-    content = mainEl.innerText.trim();
-    log("Readability produced no content — fell back to", mainEl.tagName);
+    // Fallback: first 4000 chars of body text (observer not yet populated)
+    content = document.body.innerText.trim().slice(0, 4000);
+    log("Observer Set empty — fell back to body.innerText (first 4000 chars)");
   }
 
   const wordCount = content.length > 0 ? content.split(/\s+/).length : 0;
