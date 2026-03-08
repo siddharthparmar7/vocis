@@ -7,21 +7,63 @@ const log = (...args: unknown[]) => console.log("[AI Narrator:narrator]", ...arg
 
 export function useNarrator() {
   const [state, setState] = useState<NarratorState>("IDLE");
-  const audioRef = useRef<HTMLAudioElement | null>(null);
+  const audioCtxRef = useRef<AudioContext | null>(null);
+  const sourceRef = useRef<AudioBufferSourceNode | null>(null);
+  const audioBufferRef = useRef<AudioBuffer | null>(null);
+  const pauseOffsetRef = useRef<number>(0);
+  const startTimeRef = useRef<number>(0);
+
+  function getOrCreateCtx(): AudioContext {
+    if (!audioCtxRef.current || audioCtxRef.current.state === "closed") {
+      audioCtxRef.current = new AudioContext();
+    }
+    return audioCtxRef.current;
+  }
+
+  // Stops the active source node without triggering the onended handler
+  function stopSource() {
+    if (sourceRef.current) {
+      sourceRef.current.onended = null;
+      try { sourceRef.current.stop(); } catch { /* already stopped */ }
+      sourceRef.current.disconnect();
+      sourceRef.current = null;
+    }
+  }
+
+  function startSource(ctx: AudioContext, audioBuffer: AudioBuffer, offset = 0) {
+    const source = ctx.createBufferSource();
+    source.buffer = audioBuffer;
+    source.connect(ctx.destination);
+    source.onended = () => {
+      if (sourceRef.current === source) {
+        log("Playback ended naturally");
+        sourceRef.current = null;
+        setState("IDLE");
+      }
+    };
+    source.start(0, offset);
+    sourceRef.current = source;
+    startTimeRef.current = ctx.currentTime - offset;
+  }
 
   const stop = useCallback(() => {
     log("stop()");
-    audioRef.current?.pause();
-    if (audioRef.current) {
-      audioRef.current.src = "";
-      audioRef.current = null;
-    }
+    stopSource();
+    audioBufferRef.current = null;
+    pauseOffsetRef.current = 0;
     setState("IDLE");
   }, []);
 
   const play = useCallback(async (page: ExtractedPage, voice: string) => {
     log("play() →", `"${page.title}"`, "voice:", voice);
-    stop();
+    stopSource();
+    audioBufferRef.current = null;
+    pauseOffsetRef.current = 0;
+
+    // Unlock AudioContext NOW, while we're still in the user gesture call stack
+    const ctx = getOrCreateCtx();
+    await ctx.resume();
+
     setState("LOADING");
 
     const response = await chrome.runtime.sendMessage({ type: "NARRATE", page, voice });
@@ -31,41 +73,32 @@ export function useNarrator() {
       return;
     }
 
-    const buffer: ArrayBuffer = response.data.audioBuffer;
-    log("Audio buffer received:", `${(buffer.byteLength / 1024).toFixed(1)} kB`);
-    const blob = new Blob([buffer], { type: "audio/mpeg" });
-    const url = URL.createObjectURL(blob);
+    const rawBuffer: ArrayBuffer = response.data.audioBuffer;
+    log("Audio buffer received:", `${(rawBuffer.byteLength / 1024).toFixed(1)} kB`);
 
-    const audio = new Audio(url);
-    audioRef.current = audio;
+    const audioBuffer = await ctx.decodeAudioData(rawBuffer);
+    audioBufferRef.current = audioBuffer;
 
-    audio.addEventListener("ended", () => {
-      log("Playback ended");
-      URL.revokeObjectURL(url);
-      setState("IDLE");
-    });
-
-    try {
-      await audio.play();
-      log("Playback started → PLAYING");
-      setState("PLAYING");
-    } catch (e) {
-      console.error("[AI Narrator:narrator] Audio playback blocked or failed:", e);
-      URL.revokeObjectURL(url);
-      audioRef.current = null;
-      setState("IDLE");
-    }
+    startSource(ctx, audioBuffer, 0);
+    log("Playback started → PLAYING");
+    setState("PLAYING");
   }, [stop]);
 
   const pause = useCallback(() => {
     log("pause()");
-    audioRef.current?.pause();
+    const ctx = audioCtxRef.current;
+    if (!ctx) return;
+    pauseOffsetRef.current = ctx.currentTime - startTimeRef.current;
+    stopSource();
     setState("PAUSED");
   }, []);
 
   const resume = useCallback(() => {
     log("resume()");
-    audioRef.current?.play();
+    const ctx = audioCtxRef.current;
+    const audioBuffer = audioBufferRef.current;
+    if (!ctx || !audioBuffer) return;
+    startSource(ctx, audioBuffer, pauseOffsetRef.current);
     setState("PLAYING");
   }, []);
 

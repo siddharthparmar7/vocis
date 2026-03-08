@@ -6,8 +6,15 @@ const log = (...args: unknown[]) => console.log("[AI Narrator:chat]", ...args);
 export function useChat(page: ExtractedPage | null) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [loading, setLoading] = useState(false);
-  const audioRef = useRef<HTMLAudioElement | null>(null);
+  const audioCtxRef = useRef<AudioContext | null>(null);
   const inFlightRef = useRef(false);
+
+  function getOrCreateCtx(): AudioContext {
+    if (!audioCtxRef.current || audioCtxRef.current.state === "closed") {
+      audioCtxRef.current = new AudioContext();
+    }
+    return audioCtxRef.current;
+  }
 
   const send = useCallback(async (userText: string, voice: string) => {
     if (!page || !userText.trim() || inFlightRef.current) {
@@ -18,6 +25,10 @@ export function useChat(page: ExtractedPage | null) {
     log("send():", `"${userText}"`);
     inFlightRef.current = true;
     const userMessage: ChatMessage = { role: "user", content: userText };
+
+    // Unlock AudioContext NOW, while still in the user gesture call stack
+    const ctx = getOrCreateCtx();
+    await ctx.resume();
 
     // Use functional updater to always get latest state
     let currentHistory: ChatMessage[] = [];
@@ -48,20 +59,16 @@ export function useChat(page: ExtractedPage | null) {
     log("Response received:", `"${text.slice(0, 80)}${text.length > 80 ? "…" : ""}"`);
     setMessages((prev) => [...prev, { role: "assistant", content: text }]);
 
-    // Play reply audio
-    audioRef.current?.pause();
-    const blob = new Blob([audioBuffer], { type: "audio/mpeg" });
-    const url = URL.createObjectURL(blob);
-    const audio = new Audio(url);
-    audioRef.current = audio;
-    audio.addEventListener("ended", () => URL.revokeObjectURL(url));
+    // Play reply via AudioContext (immune to autoplay policy after ctx.resume() above)
     try {
-      await audio.play();
+      const decodedBuffer = await ctx.decodeAudioData(audioBuffer);
+      const source = ctx.createBufferSource();
+      source.buffer = decodedBuffer;
+      source.connect(ctx.destination);
+      source.start(0);
       log("Playing audio response");
     } catch (e) {
       console.error("[AI Narrator:chat] Audio playback failed:", e);
-      URL.revokeObjectURL(url);
-      audioRef.current = null;
     }
   }, [page]);
 
