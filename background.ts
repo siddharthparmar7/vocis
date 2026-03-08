@@ -27,8 +27,12 @@ const PRESET_VOICES = [
   { id: "TxGEqnHWrfWFTfGW9XjX", name: "Josh" },
 ];
 
+const log = (...args: unknown[]) => console.log("[AI Narrator]", ...args);
+const err = (...args: unknown[]) => console.error("[AI Narrator]", ...args);
+
 // Open the side panel when the extension icon is clicked
 chrome.action.onClicked.addListener((tab) => {
+  log("Icon clicked, opening side panel for tab", tab.id);
   if (tab.id) {
     chrome.sidePanel.open({ tabId: tab.id });
   }
@@ -43,18 +47,21 @@ async function getKeys(): Promise<{ claudeKey: string; elevenLabsKey: string }> 
 
 async function injectContentScriptIfNeeded(tabId: number): Promise<void> {
   try {
-    // Check if content script is already injected by pinging it
     await chrome.tabs.sendMessage(tabId, { type: "PING" });
+    log("Content script already injected in tab", tabId);
   } catch {
-    // Not injected yet — inject it now
+    log("Injecting content script into tab", tabId);
     await chrome.scripting.executeScript({
       target: { tabId },
       files: ["content-script.js"],
     });
+    log("Content script injected");
   }
 }
 
 async function buildNarrationText(page: ExtractedPage, claudeKey: string): Promise<string> {
+  log("Claude: building narration text for", `"${page.title}"`, `(${page.content.length} chars)`);
+  if (!claudeKey) err("Claude API key is not set");
   const client = new Anthropic({ apiKey: claudeKey });
   const msg = await client.messages.create({
     model: "claude-sonnet-4-6",
@@ -63,10 +70,14 @@ async function buildNarrationText(page: ExtractedPage, claudeKey: string): Promi
     messages: [{ role: "user", content: `Title: ${page.title}\n\n${page.content}` }],
   });
   const block = msg.content[0];
-  return block.type === "text" ? block.text : "";
+  const text = block.type === "text" ? block.text : "";
+  log("Claude: narration ready", `(${text.length} chars, ${msg.usage.input_tokens} in / ${msg.usage.output_tokens} out tokens)`);
+  return text;
 }
 
 async function synthesizeSpeech(text: string, voiceId: string, elevenLabsKey: string): Promise<ArrayBuffer> {
+  log("ElevenLabs: synthesizing speech", `(voice: ${voiceId}, ${text.length} chars)`);
+  if (!elevenLabsKey) err("ElevenLabs API key is not set");
   const client = new ElevenLabsClient({ apiKey: elevenLabsKey });
   // convert() returns a stream.Readable per types, but in a Chrome extension service worker
   // (browser runtime) the underlying fetch returns a Web ReadableStream which supports
@@ -88,6 +99,7 @@ async function synthesizeSpeech(text: string, voiceId: string, elevenLabsKey: st
     merged.set(chunk, offset);
     offset += chunk.length;
   }
+  log("ElevenLabs: audio ready", `(${(total / 1024).toFixed(1)} kB)`);
   return merged.buffer;
 }
 
@@ -97,6 +109,8 @@ async function chatWithClaude(
   userMessage: string,
   claudeKey: string
 ): Promise<string> {
+  log("Claude: chat request", `(history: ${history.length} turns, page: "${page.title}")`);
+  if (!claudeKey) err("Claude API key is not set");
   const client = new Anthropic({ apiKey: claudeKey });
   const msg = await client.messages.create({
     model: "claude-sonnet-4-6",
@@ -108,11 +122,14 @@ async function chatWithClaude(
     ],
   });
   const block = msg.content[0];
-  return block.type === "text" ? block.text : "";
+  const text = block.type === "text" ? block.text : "";
+  log("Claude: chat response ready", `(${msg.usage.input_tokens} in / ${msg.usage.output_tokens} out tokens)`);
+  return text;
 }
 
 chrome.runtime.onMessage.addListener((message: MessageRequest, _sender, sendResponse) => {
   (async () => {
+    log("Message received:", message.type);
     try {
       const { claudeKey, elevenLabsKey } = await getKeys();
 
@@ -121,24 +138,34 @@ chrome.runtime.onMessage.addListener((message: MessageRequest, _sender, sendResp
         if (!tab?.id) throw new Error("No active tab");
         await injectContentScriptIfNeeded(tab.id);
         const result = await chrome.tabs.sendMessage(tab.id, { type: "EXTRACT_CONTENT" });
+        if (result?.success) {
+          log("Page extracted:", `"${result.data.title}"`, `(${result.data.readTimeMinutes} min read)`);
+        } else {
+          err("Page extraction failed:", result?.error);
+        }
         sendResponse(result);
 
       } else if (message.type === "NARRATE") {
+        log("Narrate: starting for", `"${message.page.title}"`);
         const audioBuffer = await withKeepalive(async () => {
           const narrationText = await buildNarrationText(message.page, claudeKey);
           return synthesizeSpeech(narrationText, message.voice, elevenLabsKey);
         });
+        log("Narrate: complete");
         sendResponse({ success: true, data: { audioBuffer } });
 
       } else if (message.type === "CHAT") {
+        log("Chat: user message:", `"${message.userMessage}"`);
         const { text: reply, audioBuffer } = await withKeepalive(async () => {
           const text = await chatWithClaude(message.page, message.history, message.userMessage, claudeKey);
           const audioBuffer = await synthesizeSpeech(text, message.voice, elevenLabsKey);
           return { text, audioBuffer };
         });
+        log("Chat: response sent");
         sendResponse({ success: true, data: { text: reply, audioBuffer } });
 
       } else if (message.type === "GET_VOICES") {
+        log("Returning", PRESET_VOICES.length, "preset voices");
         sendResponse({ success: true, data: PRESET_VOICES });
 
       } else if (message.type === "SET_KEYS") {
@@ -146,10 +173,12 @@ chrome.runtime.onMessage.addListener((message: MessageRequest, _sender, sendResp
           claudeKey: message.claudeKey,
           elevenLabsKey: message.elevenLabsKey,
         });
+        log("API keys saved");
         sendResponse({ success: true, data: null });
       }
-    } catch (err) {
-      sendResponse({ success: false, error: String(err) });
+    } catch (e) {
+      err("Handler error for", message.type, "→", e);
+      sendResponse({ success: false, error: String(e) });
     }
   })();
   return true; // keep channel open for async response

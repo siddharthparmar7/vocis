@@ -1,6 +1,8 @@
 import { useState, useCallback, useRef } from "react";
 import type { ChatMessage, ExtractedPage } from "../types";
 
+const log = (...args: unknown[]) => console.log("[AI Narrator:chat]", ...args);
+
 export function useChat(page: ExtractedPage | null) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [loading, setLoading] = useState(false);
@@ -8,8 +10,12 @@ export function useChat(page: ExtractedPage | null) {
   const inFlightRef = useRef(false);
 
   const send = useCallback(async (userText: string, voice: string) => {
-    if (!page || !userText.trim() || inFlightRef.current) return;
+    if (!page || !userText.trim() || inFlightRef.current) {
+      if (inFlightRef.current) log("send() blocked — request already in flight");
+      return;
+    }
 
+    log("send():", `"${userText}"`);
     inFlightRef.current = true;
     const userMessage: ChatMessage = { role: "user", content: userText };
 
@@ -34,11 +40,12 @@ export function useChat(page: ExtractedPage | null) {
     inFlightRef.current = false;
 
     if (!response?.success) {
-      console.error("Chat failed:", response?.error);
+      console.error("[AI Narrator:chat] CHAT failed:", response?.error);
       return;
     }
 
     const { text, audioBuffer } = response.data as { text: string; audioBuffer: ArrayBuffer };
+    log("Response received:", `"${text.slice(0, 80)}${text.length > 80 ? "…" : ""}"`);
     setMessages((prev) => [...prev, { role: "assistant", content: text }]);
 
     // Play reply audio
@@ -50,7 +57,9 @@ export function useChat(page: ExtractedPage | null) {
     audio.addEventListener("ended", () => URL.revokeObjectURL(url));
     try {
       await audio.play();
-    } catch {
+      log("Playing audio response");
+    } catch (e) {
+      console.error("[AI Narrator:chat] Audio playback failed:", e);
       URL.revokeObjectURL(url);
       audioRef.current = null;
     }

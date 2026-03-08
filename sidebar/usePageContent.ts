@@ -10,11 +10,14 @@ export function usePageContent() {
   const [state, setState] = useState<State>({ status: "loading" });
 
   const load = useCallback(async () => {
+    console.log("[AI Narrator] usePageContent: requesting page content");
     setState({ status: "loading" });
     const response = await chrome.runtime.sendMessage({ type: "GET_PAGE_CONTENT" });
     if (response?.success) {
+      console.log("[AI Narrator] usePageContent: ready —", response.data.title);
       setState({ status: "ready", page: response.data as ExtractedPage });
     } else {
+      console.error("[AI Narrator] usePageContent: failed —", response?.error);
       setState({ status: "error", message: response?.error ?? "Failed to extract page content" });
     }
   }, []);
