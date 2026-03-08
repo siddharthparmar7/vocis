@@ -6,8 +6,8 @@ function extractContent(): { title: string; content: string; readTimeMinutes: nu
   const article = reader.parse();
 
   const title = article?.title ?? document.title;
-  const content = article?.textContent?.trim() ?? document.body.innerText.trim();
-  const wordCount = content.split(/\s+/).length;
+  const content = article?.textContent?.trim() ?? document.body?.innerText?.trim() ?? "";
+  const wordCount = content.length > 0 ? content.split(/\s+/).length : 0;
   const readTimeMinutes = Math.ceil(wordCount / 200); // ~200 wpm
 
   return { title, content, readTimeMinutes };
