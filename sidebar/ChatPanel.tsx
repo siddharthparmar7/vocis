@@ -43,20 +43,17 @@ export function ChatPanel({ page, voice }: Props) {
   const [mode, setMode] = useState<ChatMode>("auto");
   const recogRef = useRef<ISpeechRecognition | null>(null);
   const bottomRef = useRef<HTMLDivElement | null>(null);
-  const playingIndexRef = useRef(-1);
+  const modeRef = useRef<ChatMode>("auto");
 
-  // Track which assistant message index is currently playing
-  useEffect(() => {
-    if (isPlaying) {
-      const lastAssistantIdx = messages
+  // Keep modeRef in sync with mode to avoid stale closures
+  useEffect(() => { modeRef.current = mode; }, [mode]);
+
+  const playingMsgIndex = isPlaying
+    ? messages
         .map((m, i) => (m.role === "assistant" ? i : -1))
         .filter((i) => i >= 0)
-        .at(-1) ?? -1;
-      playingIndexRef.current = lastAssistantIdx;
-    } else {
-      playingIndexRef.current = -1;
-    }
-  }, [isPlaying, messages]);
+        .at(-1) ?? -1
+    : -1;
 
   // Load persisted mode
   useEffect(() => {
@@ -77,8 +74,8 @@ export function ChatPanel({ page, voice }: Props) {
   }
 
   function resolveVoiceReply(fromMic: boolean): boolean {
-    if (mode === "text") return false;
-    if (mode === "voice") return true;
+    if (modeRef.current === "text") return false;
+    if (modeRef.current === "voice") return true;
     return fromMic; // auto
   }
 
@@ -92,7 +89,10 @@ export function ChatPanel({ page, voice }: Props) {
       const transcript = e.results[0][0].transcript;
       send(transcript, voice, resolveVoiceReply(true));
     };
-    recog.onend = () => setListening(false);
+    recog.onend = () => {
+      recogRef.current = null;
+      setListening(false);
+    };
     recogRef.current = recog;
     recog.start();
     setListening(true);
@@ -100,6 +100,7 @@ export function ChatPanel({ page, voice }: Props) {
 
   function cancelListening() {
     recogRef.current?.stop();
+    recogRef.current = null;
     setListening(false);
   }
 
@@ -129,7 +130,7 @@ export function ChatPanel({ page, voice }: Props) {
         )}
         {messages.map((m, i) => {
           const isActiveAudio =
-            isPlaying && m.role === "assistant" && playingIndexRef.current === i;
+            isPlaying && m.role === "assistant" && playingMsgIndex === i;
           return (
             <div key={i} className="relative">
               <div
