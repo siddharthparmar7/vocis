@@ -10,6 +10,7 @@ export function useChat(page: ExtractedPage | null) {
   const audioCtxRef = useRef<AudioContext | null>(null);
   const sourceRef = useRef<AudioBufferSourceNode | null>(null);
   const inFlightRef = useRef(false);
+  const onAudioEndedRef = useRef<(() => void) | null>(null);
 
   function getOrCreateCtx(): AudioContext {
     if (!audioCtxRef.current || audioCtxRef.current.state === "closed") {
@@ -26,6 +27,10 @@ export function useChat(page: ExtractedPage | null) {
       sourceRef.current = null;
     }
     setIsPlaying(false);
+  }, []);
+
+  const setOnAudioEnded = useCallback((cb: (() => void) | null) => {
+    onAudioEndedRef.current = cb;
   }, []);
 
   const send = useCallback(async (userText: string, voice: string, voiceReply = true) => {
@@ -72,7 +77,11 @@ export function useChat(page: ExtractedPage | null) {
     log("Response received:", `"${text.slice(0, 80)}${text.length > 80 ? "…" : ""}"`);
     setMessages((prev) => [...prev, { role: "assistant", content: text }]);
 
-    if (!audioBase64) return;
+    if (!audioBase64) {
+      // No audio — still fire the callback so conversation loop can continue
+      onAudioEndedRef.current?.();
+      return;
+    }
 
     // Play reply via AudioContext (immune to autoplay policy after ctx.resume() above)
     try {
@@ -88,6 +97,7 @@ export function useChat(page: ExtractedPage | null) {
           sourceRef.current = null;
           setIsPlaying(false);
           log("Chat audio ended naturally");
+          onAudioEndedRef.current?.();
         }
       };
       source.start(0);
@@ -99,5 +109,5 @@ export function useChat(page: ExtractedPage | null) {
     }
   }, [page, stopAudio]);
 
-  return { messages, send, loading, isPlaying, stopAudio };
+  return { messages, send, loading, isPlaying, stopAudio, setOnAudioEnded };
 }
