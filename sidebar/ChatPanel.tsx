@@ -91,6 +91,16 @@ export function ChatPanel({ page, voice }: Props) {
     return fromMic; // auto
   }
 
+  const endConversation = useCallback(() => {
+    setConversationActive(false);
+    conversationActiveRef.current = false;
+    setOnAudioEnded(null);
+    recogRef.current?.stop();
+    recogRef.current = null;
+    setListening(false);
+    stopAudio();
+  }, [setOnAudioEnded, stopAudio]);
+
   const startListening = useCallback(() => {
     const Ctor = window.SpeechRecognition ?? window.webkitSpeechRecognition;
     if (!Ctor) {
@@ -123,17 +133,7 @@ export function ChatPanel({ page, voice }: Props) {
     recogRef.current = recog;
     recog.start();
     setListening(true);
-  }, [send, voice]);
-
-  const endConversation = useCallback(() => {
-    setConversationActive(false);
-    conversationActiveRef.current = false;
-    setOnAudioEnded(null);
-    recogRef.current?.stop();
-    recogRef.current = null;
-    setListening(false);
-    stopAudio();
-  }, [setOnAudioEnded, stopAudio]);
+  }, [send, voice, endConversation]);
 
   function handleMicClick() {
     if (modeRef.current === "voice") {
