@@ -3,7 +3,7 @@ import type { ExtractedPage } from "../types";
 
 export type NarratorState = "IDLE" | "LOADING" | "PLAYING" | "PAUSED" | "STOPPED";
 
-const log = (...args: unknown[]) => console.log("[AI Narrator:narrator]", ...args);
+const log = (...args: unknown[]) => console.log("[Vocis:narrator]", ...args);
 
 export function useNarrator() {
   const [state, setState] = useState<NarratorState>("IDLE");
@@ -68,7 +68,7 @@ export function useNarrator() {
 
     const response = await chrome.runtime.sendMessage({ type: "NARRATE", page, voice });
     if (!response?.success) {
-      console.error("[AI Narrator:narrator] NARRATE failed:", response?.error);
+      console.error("[Vocis:narrator] NARRATE failed:", response?.error);
       setState("IDLE");
       return;
     }

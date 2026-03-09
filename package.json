@@ -1,7 +1,7 @@
 {
-  "name": "extension",
+  "name": "vocis",
   "version": "1.0.0",
-  "description": "",
+  "description": "Narrate any webpage and have a voice conversation with Claude about it.",
   "main": "index.js",
   "scripts": {
     "build": "vite build",

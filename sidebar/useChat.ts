@@ -1,7 +1,7 @@
 import { useState, useCallback, useRef } from "react";
 import type { ChatMessage, ExtractedPage } from "../types";
 
-const log = (...args: unknown[]) => console.log("[AI Narrator:chat]", ...args);
+const log = (...args: unknown[]) => console.log("[Vocis:chat]", ...args);
 
 export function useChat(page: ExtractedPage | null) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -69,7 +69,7 @@ export function useChat(page: ExtractedPage | null) {
     inFlightRef.current = false;
 
     if (!response?.success) {
-      console.error("[AI Narrator:chat] CHAT failed:", response?.error);
+      console.error("[Vocis:chat] CHAT failed:", response?.error);
       onAudioEndedRef.current?.();
       return;
     }
@@ -106,7 +106,7 @@ export function useChat(page: ExtractedPage | null) {
       setIsPlaying(true);
       log("Playing audio response");
     } catch (e) {
-      console.error("[AI Narrator:chat] Audio playback failed:", e);
+      console.error("[Vocis:chat] Audio playback failed:", e);
       onAudioEndedRef.current?.();
     }
   }, [page, stopAudio]);

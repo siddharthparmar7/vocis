@@ -25,7 +25,7 @@ export function App() {
   return (
     <div className="flex flex-col h-screen text-gray-900 bg-white">
       <header className="p-3 border-b flex items-center justify-between">
-        <span className="text-sm font-bold">AI Narrator</span>
+        <span className="text-sm font-bold">Vocis</span>
         <button
           className="text-gray-400 hover:text-gray-700 text-lg"
           onClick={() => setShowSettings((s) => !s)}

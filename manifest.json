@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
-  "name": "AI Narrator",
+  "name": "Vocis",
   "version": "0.1.0",
-  "description": "Narrate any webpage and chat with Claude about it.",
+  "description": "Narrate any webpage and have a voice conversation with Claude about it.",
   "permissions": ["sidePanel", "activeTab", "scripting", "storage"],
   "host_permissions": ["<all_urls>"],
   "background": {
@@ -13,7 +13,7 @@
     "default_path": "sidebar/index.html"
   },
   "action": {
-    "default_title": "Open AI Narrator"
+    "default_title": "Open Vocis"
   },
   "web_accessible_resources": [
     {

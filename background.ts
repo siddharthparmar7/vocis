@@ -27,8 +27,8 @@ const PRESET_VOICES = [
   { id: "TxGEqnHWrfWFTfGW9XjX", name: "Josh" },
 ];
 
-const log = (...args: unknown[]) => console.log("[AI Narrator]", ...args);
-const err = (...args: unknown[]) => console.error("[AI Narrator]", ...args);
+const log = (...args: unknown[]) => console.log("[Vocis]", ...args);
+const err = (...args: unknown[]) => console.error("[Vocis]", ...args);
 
 // Open the side panel when the extension icon is clicked
 chrome.action.onClicked.addListener((tab) => {

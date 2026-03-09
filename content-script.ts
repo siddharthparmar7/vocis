@@ -1,5 +1,5 @@
-const log = (...args: unknown[]) => console.log("[AI Narrator:content]", ...args);
-const err = (...args: unknown[]) => console.error("[AI Narrator:content]", ...args);
+const log = (...args: unknown[]) => console.log("[Vocis:content]", ...args);
+const err = (...args: unknown[]) => console.error("[Vocis:content]", ...args);
 
 // Block-level elements whose text represents readable content
 const CONTENT_SELECTORS = "p, h1, h2, h3, h4, h5, h6, li, blockquote, td";
