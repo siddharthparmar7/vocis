@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import type { ExtractedPage } from "../types";
 import { useChat } from "./useChat";
 
@@ -11,11 +11,15 @@ interface SpeechRecognitionResultList {
 interface SpeechRecognitionEvent {
   readonly results: SpeechRecognitionResultList;
 }
+interface SpeechRecognitionErrorEvent {
+  readonly error: string;
+}
 interface ISpeechRecognition {
   lang: string;
   interimResults: boolean;
   onresult: ((e: SpeechRecognitionEvent) => void) | null;
   onend: (() => void) | null;
+  onerror: ((e: SpeechRecognitionErrorEvent) => void) | null;
   start(): void;
   stop(): void;
 }
@@ -37,16 +41,20 @@ type Props = {
 };
 
 export function ChatPanel({ page, voice }: Props) {
-  const { messages, send, loading, isPlaying, stopAudio } = useChat(page);
+  const { messages, send, loading, isPlaying, stopAudio, setOnAudioEnded } = useChat(page);
   const [input, setInput] = useState("");
   const [listening, setListening] = useState(false);
   const [mode, setMode] = useState<ChatMode>("auto");
+  const [conversationActive, setConversationActive] = useState(false);
+  const [micError, setMicError] = useState<string | null>(null);
   const recogRef = useRef<ISpeechRecognition | null>(null);
   const bottomRef = useRef<HTMLDivElement | null>(null);
   const modeRef = useRef<ChatMode>("auto");
+  const conversationActiveRef = useRef(false);
 
-  // Keep modeRef in sync with mode to avoid stale closures
+  // Keep refs in sync
   useEffect(() => { modeRef.current = mode; }, [mode]);
+  useEffect(() => { conversationActiveRef.current = conversationActive; }, [conversationActive]);
 
   const playingMsgIndex = isPlaying
     ? messages
@@ -71,6 +79,10 @@ export function ChatPanel({ page, voice }: Props) {
   function persistMode(m: ChatMode) {
     setMode(m);
     chrome.storage.sync.set({ chatMode: m });
+    // Leaving voice mode exits any active conversation
+    if (m !== "voice" && conversationActiveRef.current) {
+      endConversation();
+    }
   }
 
   function resolveVoiceReply(fromMic: boolean): boolean {
@@ -79,12 +91,27 @@ export function ChatPanel({ page, voice }: Props) {
     return fromMic; // auto
   }
 
-  function startListening() {
+  const startListening = useCallback(() => {
     const Ctor = window.SpeechRecognition ?? window.webkitSpeechRecognition;
-    if (!Ctor) return;
+    if (!Ctor) {
+      setMicError("Speech recognition not supported in this browser.");
+      return;
+    }
+    setMicError(null);
     const recog = new Ctor();
     recog.lang = "en-US";
     recog.interimResults = false;
+    recog.onerror = (e: SpeechRecognitionErrorEvent) => {
+      if (e.error === "not-allowed") {
+        setMicError("Microphone permission denied. Check Chrome settings.");
+      } else if (e.error === "audio-capture") {
+        setMicError("No microphone found.");
+      }
+      // Exit conversation on error
+      if (conversationActiveRef.current) {
+        endConversation();
+      }
+    };
     recog.onresult = (e: SpeechRecognitionEvent) => {
       const transcript = e.results[0][0].transcript;
       send(transcript, voice, resolveVoiceReply(true));
@@ -96,12 +123,42 @@ export function ChatPanel({ page, voice }: Props) {
     recogRef.current = recog;
     recog.start();
     setListening(true);
+  }, [send, voice]);
+
+  const endConversation = useCallback(() => {
+    setConversationActive(false);
+    conversationActiveRef.current = false;
+    setOnAudioEnded(null);
+    recogRef.current?.stop();
+    recogRef.current = null;
+    setListening(false);
+    stopAudio();
+  }, [setOnAudioEnded, stopAudio]);
+
+  function handleMicClick() {
+    if (modeRef.current === "voice") {
+      // Voice mode: enter conversation loop
+      setConversationActive(true);
+      conversationActiveRef.current = true;
+      setOnAudioEnded(() => {
+        if (conversationActiveRef.current) {
+          startListening();
+        }
+      });
+      startListening();
+    } else {
+      // Auto/Text mode: single-shot
+      startListening();
+    }
   }
 
   function cancelListening() {
     recogRef.current?.stop();
     recogRef.current = null;
     setListening(false);
+    if (conversationActiveRef.current) {
+      endConversation();
+    }
   }
 
   function handleSend() {
@@ -110,8 +167,10 @@ export function ChatPanel({ page, voice }: Props) {
     setInput("");
   }
 
-  type BarState = "idle" | "recording" | "loading" | "playing";
-  const barState: BarState = listening
+  type BarState = "idle" | "recording" | "loading" | "playing" | "conversation";
+  const barState: BarState = conversationActive && !listening && !loading && !isPlaying
+    ? "conversation"
+    : listening
     ? "recording"
     : loading
     ? "loading"
@@ -164,6 +223,14 @@ export function ChatPanel({ page, voice }: Props) {
         <div ref={bottomRef} />
       </div>
 
+      {/* Mic error banner */}
+      {micError && (
+        <div className="mx-3 mb-1 px-3 py-1.5 bg-red-50 border border-red-200 rounded text-xs text-red-600 flex items-center justify-between">
+          <span>{micError}</span>
+          <button onClick={() => setMicError(null)} className="ml-2 text-red-400 hover:text-red-600">✕</button>
+        </div>
+      )}
+
       {/* Mode toggle */}
       <div className="px-3 pt-2 flex justify-end">
         <div className="flex text-xs rounded-full border border-gray-200 overflow-hidden">
@@ -201,7 +268,21 @@ export function ChatPanel({ page, voice }: Props) {
               className="text-sm px-3 py-1 border rounded text-gray-600 hover:bg-gray-100"
               onClick={cancelListening}
             >
-              ✕ Cancel
+              ✕ {conversationActive ? "End" : "Cancel"}
+            </button>
+          </div>
+        ) : barState === "conversation" ? (
+          /* Conversation loop waiting state (between turns) */
+          <div className="flex items-center gap-2 h-9">
+            <div className="flex-1 flex items-center gap-2 px-3">
+              <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
+              <span className="text-xs text-gray-500">In conversation — speak anytime</span>
+            </div>
+            <button
+              className="text-sm px-3 py-1 bg-red-100 border border-red-300 rounded text-red-600 hover:bg-red-200"
+              onClick={endConversation}
+            >
+              End
             </button>
           </div>
         ) : (
@@ -220,17 +301,17 @@ export function ChatPanel({ page, voice }: Props) {
             {/* Circular SVG mic button */}
             <button
               className={`w-8 h-8 flex items-center justify-center rounded-full border transition-colors ${
-                barState === "recording"
-                  ? "bg-red-100 border-red-400 animate-pulse"
+                mode === "voice"
+                  ? "bg-blue-50 border-blue-400 hover:bg-blue-100"
                   : "bg-gray-100 border-gray-300 hover:bg-gray-200"
               }`}
-              onClick={startListening}
+              onClick={handleMicClick}
               disabled={!page || barState !== "idle"}
-              title="Voice input"
+              title={mode === "voice" ? "Start voice conversation" : "Voice input"}
             >
               <svg
                 viewBox="0 0 24 24"
-                className="w-4 h-4 fill-none stroke-current"
+                className={`w-4 h-4 fill-none stroke-current ${mode === "voice" ? "text-blue-600" : ""}`}
                 strokeWidth="2"
               >
                 <rect x="9" y="2" width="6" height="11" rx="3" />
