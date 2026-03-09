@@ -105,23 +105,32 @@ export function ChatPanel({ page, voice }: Props) {
     return () => { endConversation(); };
   }, [endConversation]);
 
-  const startListening = useCallback(() => {
+  const startListening = useCallback(async () => {
     const Ctor = window.SpeechRecognition ?? window.webkitSpeechRecognition;
     if (!Ctor) {
       setMicError("Speech recognition not supported in this browser.");
       return;
     }
     setMicError(null);
+
+    // chrome-extension:// pages don't trigger the mic permission dialog via
+    // SpeechRecognition alone — getUserMedia is required to unlock it.
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      stream.getTracks().forEach((t) => t.stop());
+    } catch {
+      setMicError("Microphone permission denied. Check Chrome settings.");
+      if (conversationActiveRef.current) endConversation();
+      return;
+    }
+
     const recog = new Ctor();
     recog.lang = "en-US";
     recog.interimResults = false;
     recog.onerror = (e: SpeechRecognitionErrorEvent) => {
-      if (e.error === "not-allowed") {
-        setMicError("Microphone permission denied. Check Chrome settings.");
-      } else if (e.error === "audio-capture") {
+      if (e.error === "audio-capture") {
         setMicError("No microphone found.");
       }
-      // Exit conversation on error
       if (conversationActiveRef.current) {
         endConversation();
       }
