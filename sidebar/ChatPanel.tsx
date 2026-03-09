@@ -101,6 +101,10 @@ export function ChatPanel({ page, voice }: Props) {
     stopAudio();
   }, [setOnAudioEnded, stopAudio]);
 
+  useEffect(() => {
+    return () => { endConversation(); };
+  }, [endConversation]);
+
   const startListening = useCallback(() => {
     const Ctor = window.SpeechRecognition ?? window.webkitSpeechRecognition;
     if (!Ctor) {
@@ -325,7 +329,7 @@ export function ChatPanel({ page, voice }: Props) {
             {barState === "playing" ? (
               <button
                 className="text-sm px-3 py-1 bg-red-500 text-white rounded hover:bg-red-600 flex items-center gap-1"
-                onClick={stopAudio}
+                onClick={conversationActive ? endConversation : stopAudio}
               >
                 <svg viewBox="0 0 10 10" className="w-3 h-3 fill-current">
                   <rect x="1" y="1" width="8" height="8" rx="1" />
@@ -333,12 +337,22 @@ export function ChatPanel({ page, voice }: Props) {
                 Stop
               </button>
             ) : barState === "loading" ? (
-              <button
-                className="text-sm px-3 py-1 bg-gray-300 text-gray-500 rounded"
-                disabled
-              >
-                …
-              </button>
+              <>
+                <button
+                  className="text-sm px-3 py-1 bg-gray-300 text-gray-500 rounded"
+                  disabled
+                >
+                  …
+                </button>
+                {conversationActive && (
+                  <button
+                    className="text-sm px-3 py-1 bg-red-100 border border-red-300 rounded text-red-600 hover:bg-red-200"
+                    onClick={endConversation}
+                  >
+                    End
+                  </button>
+                )}
+              </>
             ) : (
               <button
                 className="text-sm px-3 py-1 bg-blue-600 text-white rounded hover:bg-blue-700 flex items-center gap-1"

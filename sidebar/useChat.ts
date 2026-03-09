@@ -70,6 +70,7 @@ export function useChat(page: ExtractedPage | null) {
 
     if (!response?.success) {
       console.error("[AI Narrator:chat] CHAT failed:", response?.error);
+      onAudioEndedRef.current?.();
       return;
     }
 
@@ -106,6 +107,7 @@ export function useChat(page: ExtractedPage | null) {
       log("Playing audio response");
     } catch (e) {
       console.error("[AI Narrator:chat] Audio playback failed:", e);
+      onAudioEndedRef.current?.();
     }
   }, [page, stopAudio]);
 
