@@ -2,37 +2,6 @@ import { useState, useRef, useEffect, useCallback } from "react";
 import type { ExtractedPage } from "../types";
 import { useChat } from "./useChat";
 
-interface SpeechRecognitionResult {
-  readonly 0: { transcript: string };
-}
-interface SpeechRecognitionResultList {
-  readonly 0: SpeechRecognitionResult;
-}
-interface SpeechRecognitionEvent {
-  readonly results: SpeechRecognitionResultList;
-}
-interface SpeechRecognitionErrorEvent {
-  readonly error: string;
-}
-interface ISpeechRecognition {
-  lang: string;
-  interimResults: boolean;
-  onresult: ((e: SpeechRecognitionEvent) => void) | null;
-  onend: (() => void) | null;
-  onerror: ((e: SpeechRecognitionErrorEvent) => void) | null;
-  start(): void;
-  stop(): void;
-}
-interface ISpeechRecognitionConstructor {
-  new (): ISpeechRecognition;
-}
-declare global {
-  interface Window {
-    SpeechRecognition?: ISpeechRecognitionConstructor;
-    webkitSpeechRecognition?: ISpeechRecognitionConstructor;
-  }
-}
-
 type ChatMode = "auto" | "text" | "voice";
 
 type Props = {
@@ -47,7 +16,6 @@ export function ChatPanel({ page, voice }: Props) {
   const [mode, setMode] = useState<ChatMode>("auto");
   const [conversationActive, setConversationActive] = useState(false);
   const [micError, setMicError] = useState<string | null>(null);
-  const recogRef = useRef<ISpeechRecognition | null>(null);
   const bottomRef = useRef<HTMLDivElement | null>(null);
   const modeRef = useRef<ChatMode>("auto");
   const conversationActiveRef = useRef(false);
@@ -76,10 +44,17 @@ export function ChatPanel({ page, voice }: Props) {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, loading]);
 
+  // Send a message to the content script in the active tab.
+  // Speech recognition runs there (web-page context → inherits page's mic permission).
+  const speechMessage = useCallback((msg: Record<string, unknown>) => {
+    chrome.tabs.query({ active: true, currentWindow: true }).then(([tab]) => {
+      if (tab?.id) chrome.tabs.sendMessage(tab.id, msg).catch(() => {});
+    });
+  }, []);
+
   function persistMode(m: ChatMode) {
     setMode(m);
     chrome.storage.sync.set({ chatMode: m });
-    // Leaving voice mode exits any active conversation
     if (m !== "voice" && conversationActiveRef.current) {
       endConversation();
     }
@@ -95,58 +70,45 @@ export function ChatPanel({ page, voice }: Props) {
     setConversationActive(false);
     conversationActiveRef.current = false;
     setOnAudioEnded(null);
-    recogRef.current?.stop();
-    recogRef.current = null;
+    speechMessage({ type: "SPEECH_STOP" });
     setListening(false);
     stopAudio();
-  }, [setOnAudioEnded, stopAudio]);
+  }, [setOnAudioEnded, stopAudio, speechMessage]);
 
   useEffect(() => {
     return () => { endConversation(); };
   }, [endConversation]);
 
-  const startListening = useCallback(async () => {
-    const Ctor = window.SpeechRecognition ?? window.webkitSpeechRecognition;
-    if (!Ctor) {
-      setMicError("Speech recognition not supported in this browser.");
-      return;
-    }
-    setMicError(null);
-
-    // chrome-extension:// pages don't trigger the mic permission dialog via
-    // SpeechRecognition alone — getUserMedia is required to unlock it.
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      stream.getTracks().forEach((t) => t.stop());
-    } catch {
-      setMicError("Microphone permission denied. Check Chrome settings.");
-      if (conversationActiveRef.current) endConversation();
-      return;
-    }
-
-    const recog = new Ctor();
-    recog.lang = "en-US";
-    recog.interimResults = false;
-    recog.onerror = (e: SpeechRecognitionErrorEvent) => {
-      if (e.error === "audio-capture") {
-        setMicError("No microphone found.");
-      }
-      if (conversationActiveRef.current) {
-        endConversation();
+  // Receive speech results from the content script
+  useEffect(() => {
+    const handler = (msg: Record<string, unknown>) => {
+      if (msg.type === "SPEECH_RESULT" && typeof msg.transcript === "string") {
+        // Mic always means voiceReply=true unless text mode
+        send(msg.transcript, voice, modeRef.current !== "text");
+      } else if (msg.type === "SPEECH_END") {
+        setListening(false);
+      } else if (msg.type === "SPEECH_ERROR") {
+        const error = String(msg.error ?? "");
+        if (error === "not-allowed") {
+          setMicError("Microphone access denied. Click the mic icon in the address bar to allow.");
+        } else if (error === "audio-capture") {
+          setMicError("No microphone found.");
+        } else if (error === "not-supported") {
+          setMicError("Speech recognition not supported in this browser.");
+        }
+        setListening(false);
+        if (conversationActiveRef.current) endConversation();
       }
     };
-    recog.onresult = (e: SpeechRecognitionEvent) => {
-      const transcript = e.results[0][0].transcript;
-      send(transcript, voice, resolveVoiceReply(true));
-    };
-    recog.onend = () => {
-      recogRef.current = null;
-      setListening(false);
-    };
-    recogRef.current = recog;
-    recog.start();
-    setListening(true);
+    chrome.runtime.onMessage.addListener(handler);
+    return () => chrome.runtime.onMessage.removeListener(handler);
   }, [send, voice, endConversation]);
+
+  const startListening = useCallback(() => {
+    setMicError(null);
+    speechMessage({ type: "SPEECH_START", lang: "en-US" });
+    setListening(true);
+  }, [speechMessage]);
 
   function handleMicClick() {
     if (modeRef.current === "voice") {
@@ -154,9 +116,7 @@ export function ChatPanel({ page, voice }: Props) {
       setConversationActive(true);
       conversationActiveRef.current = true;
       setOnAudioEnded(() => {
-        if (conversationActiveRef.current) {
-          startListening();
-        }
+        if (conversationActiveRef.current) startListening();
       });
       startListening();
     } else {
@@ -166,12 +126,9 @@ export function ChatPanel({ page, voice }: Props) {
   }
 
   function cancelListening() {
-    recogRef.current?.stop();
-    recogRef.current = null;
+    speechMessage({ type: "SPEECH_STOP" });
     setListening(false);
-    if (conversationActiveRef.current) {
-      endConversation();
-    }
+    if (conversationActiveRef.current) endConversation();
   }
 
   function handleSend() {
@@ -285,7 +242,6 @@ export function ChatPanel({ page, voice }: Props) {
             </button>
           </div>
         ) : barState === "conversation" ? (
-          /* Conversation loop waiting state (between turns) */
           <div className="flex items-center gap-2 h-9">
             <div className="flex-1 flex items-center gap-2 px-3">
               <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />

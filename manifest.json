@@ -3,7 +3,7 @@
   "name": "AI Narrator",
   "version": "0.1.0",
   "description": "Narrate any webpage and chat with Claude about it.",
-  "permissions": ["sidePanel", "activeTab", "scripting", "storage", "microphone"],
+  "permissions": ["sidePanel", "activeTab", "scripting", "storage"],
   "host_permissions": ["<all_urls>"],
   "background": {
     "service_worker": "background.js",
