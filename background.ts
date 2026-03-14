@@ -34,7 +34,14 @@ const err = (...args: unknown[]) => console.error("[Vocis]", ...args);
 chrome.action.onClicked.addListener((tab) => {
   log("Icon clicked, opening side panel for tab", tab.id);
   if (tab.id) {
-    chrome.sidePanel.open({ tabId: tab.id });
+    (async () => {
+      await chrome.sidePanel.setOptions({
+        tabId: tab.id,
+        path: "sidebar/index.html",
+        enabled: true,
+      });
+      await chrome.sidePanel.open({ tabId: tab.id });
+    })();
   }
 });
 

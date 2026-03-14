@@ -9,9 +9,6 @@
     "service_worker": "background.js",
     "type": "module"
   },
-  "side_panel": {
-    "default_path": "sidebar/index.html"
-  },
   "action": {
     "default_title": "Open Vocis"
   },
