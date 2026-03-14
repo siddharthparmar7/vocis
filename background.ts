@@ -91,26 +91,17 @@ async function buildNarrationText(page: ExtractedPage, claudeKey: string): Promi
   return text;
 }
 
-async function synthesizeSpeech(text: string, voiceId: string, elevenLabsKey: string, quality: "high" | "fast" = "fast"): Promise<string> {
+async function synthesizeSpeech(text: string, voiceId: string, elevenLabsKey: string): Promise<string> {
   log("ElevenLabs: synthesizing speech", `(voice: ${voiceId}, ${text.length} chars)`);
   if (!elevenLabsKey) err("ElevenLabs API key is not set");
   const client = new ElevenLabsClient({ apiKey: elevenLabsKey });
   // convert() returns a stream.Readable per types, but in a Chrome extension service worker
   // (browser runtime) the underlying fetch returns a Web ReadableStream which supports
   // async iteration. We cast to AsyncIterable to consume it generically.
-  const isHighQuality = quality === "high";
   const audioStream = await client.textToSpeech.convert(voiceId, {
     text,
-    model_id: isHighQuality ? "eleven_multilingual_v2" : "eleven_turbo_v2",
+    model_id: "eleven_turbo_v2",
     output_format: "mp3_44100_128",
-    ...(isHighQuality ? {
-      voice_settings: {
-        stability: 0.4,
-        similarity_boost: 0.75,
-        style: 0.5,
-        use_speaker_boost: true,
-      },
-    } : {}),
   });
   const iterable = audioStream as unknown as AsyncIterable<Uint8Array>;
   const chunks: Uint8Array[] = [];
@@ -179,7 +170,7 @@ chrome.runtime.onMessage.addListener((message: MessageRequest, _sender, sendResp
         log("Narrate: starting for", `"${message.page.title}"`);
         const audioBuffer = await withKeepalive(async () => {
           const narrationText = await buildNarrationText(message.page, claudeKey);
-          return synthesizeSpeech(narrationText, message.voice, elevenLabsKey, "high");
+          return synthesizeSpeech(narrationText, message.voice, elevenLabsKey);
         });
         log("Narrate: complete");
         sendResponse({ success: true, data: { audioBase64: audioBuffer } });

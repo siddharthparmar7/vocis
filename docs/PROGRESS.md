@@ -110,6 +110,18 @@ Added speech recognition bridge to `content-script.ts` — `SPEECH_START` / `SPE
 
 ---
 
+### 2026-03-14 — Revert to eleven_turbo_v2 (fix 402 on ElevenLabs)
+
+**What was built:** Removed `eleven_multilingual_v2` and premium voice settings (`style`, `use_speaker_boost`). Now uses `eleven_turbo_v2` for all synthesis. Removed the `quality: "high" | "fast"` parameter from `synthesizeSpeech` entirely.
+
+**Key decisions:** `eleven_multilingual_v2`, `style`, and `use_speaker_boost` require a paid ElevenLabs tier — free plan only supports `eleven_turbo_v2`.
+
+**Bugs / gotchas:** ElevenLabs returns HTTP 402 with an empty body `{}` when the model or settings exceed the current plan — not a helpful error message.
+
+**What was tried and didn't work:** `eleven_multilingual_v2` with `voice_settings: { stability, similarity_boost, style, use_speaker_boost }` — 402 Payment Required on the free plan.
+
+---
+
 ### 2026-03-14 — Visible error surfacing + resilient chat text
 
 **What was built:** Added user-visible error banners when API calls fail. Previously all errors were silently swallowed (only logged to the service worker console). Now:
