@@ -95,3 +95,15 @@ Added speech recognition bridge to `content-script.ts` — `SPEECH_START` / `SPE
 **Bugs / gotchas:** The previous "fix" (async IIFE) was introduced by a code quality reviewer who correctly identified an unawaited Promise but didn't know about Chrome's user gesture requirement. The panel appeared to build fine but silently failed to open at runtime.
 
 **What was tried and didn't work:** Async IIFE with `await setOptions` before `open` — `open()` is silently ignored because the user gesture context expires across an `await`. (include root cause if known; use N/A if nothing failed)
+
+---
+
+### 2026-03-14 — Melodious narration voice
+
+**What was built:** Switched narration from `eleven_turbo_v2` to `eleven_multilingual_v2` with expressive voice settings (stability: 0.4, similarity_boost: 0.75, style: 0.5, use_speaker_boost: true). Chat replies keep `eleven_turbo_v2` for low latency. Added optional `quality: "high" | "fast"` param to `synthesizeSpeech`; NARRATE passes `"high"`, CHAT uses the default `"fast"`.
+
+**Key decisions:** Quality/speed split keeps voice conversation snappy while making long narrations sound much more natural and expressive. `voice_settings` are only applied when `quality === "high"` to avoid affecting chat latency.
+
+**Bugs / gotchas:** None anticipated.
+
+**What was tried and didn't work:** N/A (include root cause if known; use N/A if nothing failed)
