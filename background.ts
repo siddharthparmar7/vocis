@@ -34,14 +34,16 @@ const err = (...args: unknown[]) => console.error("[Vocis]", ...args);
 chrome.action.onClicked.addListener((tab) => {
   log("Icon clicked, opening side panel for tab", tab.id);
   if (tab.id) {
-    (async () => {
-      await chrome.sidePanel.setOptions({
-        tabId: tab.id,
-        path: "sidebar/index.html",
-        enabled: true,
-      });
-      await chrome.sidePanel.open({ tabId: tab.id });
-    })();
+    // setOptions and open must be called synchronously within the user gesture
+    // context — awaiting setOptions would expire the gesture and open() would
+    // be silently ignored by Chrome. IPC calls are FIFO so setOptions is
+    // guaranteed to be applied before open() is processed in the browser.
+    chrome.sidePanel.setOptions({
+      tabId: tab.id,
+      path: "sidebar/index.html",
+      enabled: true,
+    });
+    chrome.sidePanel.open({ tabId: tab.id });
   }
 });
 

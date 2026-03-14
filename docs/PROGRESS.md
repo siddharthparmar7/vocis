@@ -80,6 +80,18 @@ Added speech recognition bridge to `content-script.ts` — `SPEECH_START` / `SPE
 - Each tab gets its own independent panel instance with separate React state (chat history, page content, narration state). User preferences (`chrome.storage.sync`: voice selection, chat mode) are intentionally shared across tabs; API keys remain in `chrome.storage.local`.
 - Chrome persists tab-specific `sidePanel` options across service worker restarts, so no re-enablement logic is needed.
 
-**Bugs / gotchas:** `chrome.sidePanel.setOptions()` returns `Promise<void>` — calling `open()` without awaiting it is a race condition. Fixed by wrapping both calls in an async IIFE (same pattern as the `onMessage` handler).
+**Bugs / gotchas:** `chrome.sidePanel.setOptions()` returns `Promise<void>` — a code reviewer flagged calling `open()` without awaiting it as a race condition and wrapped both in an async IIFE. This broke the feature entirely (see next entry).
 
 **What was tried and didn't work:** N/A
+
+---
+
+### 2026-03-13 — Fix: sidePanel.open() user gesture context
+
+**What was built:** Removed async IIFE from the icon-click handler so `setOptions` and `open` are called synchronously.
+
+**Key decisions:** `chrome.sidePanel.open()` is a user-gesture-required API. Chrome tracks gestures synchronously — `await`ing anything before `open()` expires the gesture context and Chrome silently ignores the call. Both `setOptions` and `open` are now fire-and-forget; Chrome's FIFO IPC ordering guarantees `setOptions` is applied in the browser process before `open` is handled, so there is no real race condition.
+
+**Bugs / gotchas:** The previous "fix" (async IIFE) was introduced by a code quality reviewer who correctly identified an unawaited Promise but didn't know about Chrome's user gesture requirement. The panel appeared to build fine but silently failed to open at runtime.
+
+**What was tried and didn't work:** Async IIFE with `await setOptions` before `open` — `open()` is silently ignored because the user gesture context expires across an `await`. (include root cause if known; use N/A if nothing failed)
