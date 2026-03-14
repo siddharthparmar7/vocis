@@ -101,7 +101,7 @@ async function synthesizeSpeech(text: string, voiceId: string, elevenLabsKey: st
   const audioStream = await client.textToSpeech.convert(voiceId, {
     text,
     model_id: "eleven_turbo_v2",
-    output_format: "mp3_44100_128",
+    output_format: "mp3_44100_64",
   });
   const iterable = audioStream as unknown as AsyncIterable<Uint8Array>;
   const chunks: Uint8Array[] = [];
