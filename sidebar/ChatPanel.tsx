@@ -16,6 +16,7 @@ export function ChatPanel({ page, voice }: Props) {
   const [mode, setMode] = useState<ChatMode>("auto");
   const [conversationActive, setConversationActive] = useState(false);
   const [micError, setMicError] = useState<string | null>(null);
+  const [interimTranscript, setInterimTranscript] = useState("");
   const bottomRef = useRef<HTMLDivElement | null>(null);
   const modeRef = useRef<ChatMode>("auto");
   const conversationActiveRef = useRef(false);
@@ -72,6 +73,7 @@ export function ChatPanel({ page, voice }: Props) {
     setOnAudioEnded(null);
     speechMessage({ type: "SPEECH_STOP" });
     setListening(false);
+    setInterimTranscript("");
     stopAudio();
   }, [setOnAudioEnded, stopAudio, speechMessage]);
 
@@ -83,10 +85,14 @@ export function ChatPanel({ page, voice }: Props) {
   useEffect(() => {
     const handler = (msg: Record<string, unknown>) => {
       if (msg.type === "SPEECH_RESULT" && typeof msg.transcript === "string") {
+        setInterimTranscript("");
         // Mic always means voiceReply=true unless text mode
         send(msg.transcript, voice, modeRef.current !== "text");
       } else if (msg.type === "SPEECH_END") {
+        setInterimTranscript("");
         setListening(false);
+      } else if (msg.type === "SPEECH_INTERIM" && typeof msg.transcript === "string") {
+        setInterimTranscript(msg.transcript);
       } else if (msg.type === "SPEECH_ERROR") {
         const error = String(msg.error ?? "");
         if (error === "not-allowed") {
@@ -128,6 +134,7 @@ export function ChatPanel({ page, voice }: Props) {
   function cancelListening() {
     speechMessage({ type: "SPEECH_STOP" });
     setListening(false);
+    setInterimTranscript("");
     if (conversationActiveRef.current) endConversation();
   }
 
@@ -224,15 +231,17 @@ export function ChatPanel({ page, voice }: Props) {
       <div className="border-t p-2">
         {barState === "recording" ? (
           <div className="flex items-center gap-2 h-9">
-            <div className="flex-1 flex items-center gap-1.5 px-3">
-              {[0, 1, 2, 3].map((i) => (
+            <div className="flex-1 flex items-center gap-1.5 px-3 min-w-0">
+              {!interimTranscript && [0, 1, 2, 3].map((i) => (
                 <span
                   key={i}
-                  className="w-1.5 h-1.5 rounded-full bg-red-500 animate-bounce"
+                  className="w-1.5 h-1.5 rounded-full bg-red-500 animate-bounce flex-shrink-0"
                   style={{ animationDelay: `${i * 0.1}s` }}
                 />
               ))}
-              <span className="text-xs text-gray-500 ml-1">Listening…</span>
+              <span className="text-xs text-gray-500 ml-1 truncate">
+                {interimTranscript || "Listening…"}
+              </span>
             </div>
             <button
               className="text-sm px-3 py-1 border rounded text-gray-600 hover:bg-gray-100"

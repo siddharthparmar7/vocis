@@ -107,3 +107,15 @@ Added speech recognition bridge to `content-script.ts` — `SPEECH_START` / `SPE
 **Bugs / gotchas:** None anticipated.
 
 **What was tried and didn't work:** N/A (include root cause if known; use N/A if nothing failed)
+
+---
+
+### 2026-03-14 — Live voice transcript preview
+
+**What was built:** Enabled `interimResults: true` in `content-script.ts` speech recognizer. Partial results emit `SPEECH_INTERIM` messages; final results continue to emit `SPEECH_RESULT`. In `ChatPanel.tsx`, an `interimTranscript` state string updates on each `SPEECH_INTERIM` and is cleared on `SPEECH_RESULT`/`SPEECH_END`. The recording bar shows the live transcript instead of "Listening…" when interim text is available; the animated dots hide while text is showing.
+
+**Key decisions:** `SPEECH_INTERIM` is a separate message type from `SPEECH_RESULT` so the sidebar never accidentally calls `send()` on a partial result. Dots are hidden when transcript text is present to avoid layout shift; `min-w-0` + `truncate` on the container prevent overflow.
+
+**Bugs / gotchas:** None anticipated.
+
+**What was tried and didn't work:** N/A (include root cause if known; use N/A if nothing failed)
