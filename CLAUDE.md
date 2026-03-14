@@ -1,6 +1,6 @@
-# smart-voice
+# Vocis
 
-Chrome MV3 extension that narrates any webpage via ElevenLabs TTS and enables voice/text chat with Claude using the page as context.
+Chrome MV3 extension that narrates any webpage via ElevenLabs TTS and enables voice and text conversations with Claude using the page as context.
 
 ## Commands
 
@@ -13,6 +13,10 @@ npx tsc --noEmit   # type-check only
 To load in Chrome: `chrome://extensions` → Developer mode → Load unpacked → select `dist/`
 
 After code changes, click the refresh icon on the extension card in `chrome://extensions`.
+
+## Progress log
+
+See `docs/PROGRESS.md` for a full log of everything implemented, key decisions, bugs fixed, and approaches that didn't work.
 
 ## Architecture
 
@@ -39,6 +43,7 @@ content-script.ts       IntersectionObserver extraction of visible elements, res
 types.ts                Shared types: ExtractedPage, ChatMessage, MessageRequest
 vite.config.ts          Build config (vite-plugin-web-extension)
 tailwind.config.js      Tailwind v3, scoped to sidebar/**
+docs/PROGRESS.md        Living log of what has been implemented, decisions made, and bugs fixed
 
 sidebar/
   App.tsx               Root component, voice state, settings toggle
@@ -76,10 +81,10 @@ All logs are prefixed for easy filtering:
 
 | Prefix | Where |
 |---|---|
-| `[AI Narrator]` | Service worker — inspect via `chrome://extensions` → service worker |
-| `[AI Narrator:content]` | Page DevTools console |
-| `[AI Narrator:narrator]` | Sidebar DevTools (right-click sidebar → Inspect) |
-| `[AI Narrator:chat]` | Sidebar DevTools |
+| `[Vocis]` | Service worker — inspect via `chrome://extensions` → service worker |
+| `[Vocis:content]` | Page DevTools console |
+| `[Vocis:narrator]` | Sidebar DevTools (right-click sidebar → Inspect) |
+| `[Vocis:chat]` | Sidebar DevTools |
 
 ## Known Constraints
 
@@ -91,3 +96,7 @@ All logs are prefixed for easy filtering:
 ## Out of Scope (v1)
 
 Voice cloning, offline TTS, Firefox/mobile support, multi-tab persistence.
+
+## Standing instruction
+
+After completing any task or fix, append an entry to `docs/PROGRESS.md` following the format at the top of that file. Stage `docs/PROGRESS.md` explicitly and include it in the same commit as the code change.
