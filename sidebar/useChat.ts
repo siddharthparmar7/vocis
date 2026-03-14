@@ -7,6 +7,7 @@ export function useChat(page: ExtractedPage | null) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [loading, setLoading] = useState(false);
   const [isPlaying, setIsPlaying] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const audioCtxRef = useRef<AudioContext | null>(null);
   const sourceRef = useRef<AudioBufferSourceNode | null>(null);
   const inFlightRef = useRef(false);
@@ -41,6 +42,7 @@ export function useChat(page: ExtractedPage | null) {
 
     log("send():", `"${userText}"`, "voiceReply:", voiceReply);
     inFlightRef.current = true;
+    setError(null);
     const userMessage: ChatMessage = { role: "user", content: userText };
 
     // Unlock AudioContext NOW, while still in the user gesture call stack
@@ -69,7 +71,9 @@ export function useChat(page: ExtractedPage | null) {
     inFlightRef.current = false;
 
     if (!response?.success) {
-      console.error("[Vocis:chat] CHAT failed:", response?.error);
+      const errMsg = response?.error ?? "Request failed";
+      console.error("[Vocis:chat] CHAT failed:", errMsg);
+      setError(errMsg);
       onAudioEndedRef.current?.();
       return;
     }
@@ -111,5 +115,5 @@ export function useChat(page: ExtractedPage | null) {
     }
   }, [page, stopAudio]);
 
-  return { messages, send, loading, isPlaying, stopAudio, setOnAudioEnded };
+  return { messages, send, loading, isPlaying, stopAudio, setOnAudioEnded, error, clearError: () => setError(null) };
 }

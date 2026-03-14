@@ -17,7 +17,7 @@ type Props = {
 };
 
 export function NarratorPanel({ page, voice, onVoiceChange }: Props) {
-  const { state, play, pause, resume, stop } = useNarrator();
+  const { state, play, pause, resume, stop, error } = useNarrator();
 
   return (
     <div className="p-4 space-y-3">
@@ -36,6 +36,12 @@ export function NarratorPanel({ page, voice, onVoiceChange }: Props) {
           <option key={v.id} value={v.id}>{v.name}</option>
         ))}
       </select>
+
+      {error && (
+        <div className="px-3 py-1.5 bg-red-50 border border-red-200 rounded text-xs text-red-600 truncate">
+          {error}
+        </div>
+      )}
 
       <div className="flex gap-2">
         {state === "IDLE" && (

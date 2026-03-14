@@ -186,14 +186,23 @@ chrome.runtime.onMessage.addListener((message: MessageRequest, _sender, sendResp
 
       } else if (message.type === "CHAT") {
         log("Chat: user message:", `"${message.userMessage}"`, "voiceReply:", message.voiceReply);
-        const { text: reply, audioBase64 } = await withKeepalive(async () => {
-          const text = await chatWithClaude(message.page, message.history, message.userMessage, claudeKey);
-          if (!message.voiceReply) return { text, audioBase64: null };
-          const audioBase64 = await synthesizeSpeech(text, message.voice, elevenLabsKey);
-          return { text, audioBase64 };
-        });
+        // Get Claude text first — always returned even if ElevenLabs fails
+        const text = await withKeepalive(() =>
+          chatWithClaude(message.page, message.history, message.userMessage, claudeKey)
+        );
+        // Synthesize audio separately — failure is non-fatal (text still returned)
+        let audioBase64: string | null = null;
+        if (message.voiceReply) {
+          try {
+            audioBase64 = await withKeepalive(() =>
+              synthesizeSpeech(text, message.voice, elevenLabsKey)
+            );
+          } catch (audioErr) {
+            err("ElevenLabs synthesis failed (text-only fallback):", audioErr);
+          }
+        }
         log("Chat: response sent");
-        sendResponse({ success: true, data: { text: reply, audioBase64 } });
+        sendResponse({ success: true, data: { text, audioBase64 } });
 
       } else if (message.type === "GET_VOICES") {
         log("Returning", PRESET_VOICES.length, "preset voices");

@@ -7,6 +7,7 @@ const log = (...args: unknown[]) => console.log("[Vocis:narrator]", ...args);
 
 export function useNarrator() {
   const [state, setState] = useState<NarratorState>("IDLE");
+  const [error, setError] = useState<string | null>(null);
   const audioCtxRef = useRef<AudioContext | null>(null);
   const sourceRef = useRef<AudioBufferSourceNode | null>(null);
   const audioBufferRef = useRef<AudioBuffer | null>(null);
@@ -64,11 +65,14 @@ export function useNarrator() {
     const ctx = getOrCreateCtx();
     await ctx.resume();
 
+    setError(null);
     setState("LOADING");
 
     const response = await chrome.runtime.sendMessage({ type: "NARRATE", page, voice });
     if (!response?.success) {
-      console.error("[Vocis:narrator] NARRATE failed:", response?.error);
+      const errMsg = response?.error ?? "Narration failed";
+      console.error("[Vocis:narrator] NARRATE failed:", errMsg);
+      setError(errMsg);
       setState("IDLE");
       return;
     }
@@ -104,5 +108,5 @@ export function useNarrator() {
     setState("PLAYING");
   }, []);
 
-  return { state, play, pause, resume, stop };
+  return { state, play, pause, resume, stop, error };
 }

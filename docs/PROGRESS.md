@@ -110,6 +110,24 @@ Added speech recognition bridge to `content-script.ts` — `SPEECH_START` / `SPE
 
 ---
 
+### 2026-03-14 — Visible error surfacing + resilient chat text
+
+**What was built:** Added user-visible error banners when API calls fail. Previously all errors were silently swallowed (only logged to the service worker console). Now:
+- Chat failures show a dismissible red error banner above the input bar (`chatError` state in `useChat.ts`, rendered in `ChatPanel.tsx`)
+- Narration failures show a red banner in the narrator panel (`error` state in `useNarrator.ts`, rendered in `NarratorPanel.tsx`)
+
+Also fixed a latent architecture issue in the CHAT handler in `background.ts`: the Claude text call and the ElevenLabs audio call were wrapped in a single `withKeepalive`. If ElevenLabs threw, the entire response failed and the user saw no text at all. Split them: Claude runs first and always returns text; ElevenLabs runs separately and on failure logs the error and returns `audioBase64: null` (text-only fallback).
+
+**Key decisions:**
+- Chat error banner is dismissible (✕ button). Narration error auto-clears on next narrate attempt.
+- Text-only fallback for chat is silent — user gets text without audio, which is better than nothing.
+
+**Bugs / gotchas:** Root cause of "no response" bug was likely ElevenLabs synthesis failing (new `eleven_multilingual_v2` model or `voice_settings` rejected), causing the entire CHAT response to fail including the text.
+
+**What was tried and didn't work:** N/A
+
+---
+
 ### 2026-03-14 — Live voice transcript preview
 
 **What was built:** Enabled `interimResults: true` in `content-script.ts` speech recognizer. Partial results emit `SPEECH_INTERIM` messages; final results continue to emit `SPEECH_RESULT`. In `ChatPanel.tsx`, an `interimTranscript` state string updates on each `SPEECH_INTERIM` and is cleared on `SPEECH_RESULT`/`SPEECH_END`. The recording bar shows the live transcript instead of "Listening…" when interim text is available; the animated dots hide while text is showing.

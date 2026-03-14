@@ -10,7 +10,7 @@ type Props = {
 };
 
 export function ChatPanel({ page, voice }: Props) {
-  const { messages, send, loading, isPlaying, stopAudio, setOnAudioEnded } = useChat(page);
+  const { messages, send, loading, isPlaying, stopAudio, setOnAudioEnded, error: chatError, clearError: clearChatError } = useChat(page);
   const [input, setInput] = useState("");
   const [listening, setListening] = useState(false);
   const [mode, setMode] = useState<ChatMode>("auto");
@@ -199,6 +199,14 @@ export function ChatPanel({ page, voice }: Props) {
         )}
         <div ref={bottomRef} />
       </div>
+
+      {/* Chat API error banner */}
+      {chatError && (
+        <div className="mx-3 mb-1 px-3 py-1.5 bg-red-50 border border-red-200 rounded text-xs text-red-600 flex items-center justify-between">
+          <span className="truncate">{chatError}</span>
+          <button onClick={clearChatError} className="ml-2 flex-shrink-0 text-red-400 hover:text-red-600">✕</button>
+        </div>
+      )}
 
       {/* Mic error banner */}
       {micError && (
