@@ -120,7 +120,7 @@ Added speech recognition bridge to `content-script.ts` — `SPEECH_START` / `SPE
 
 **What was tried and didn't work:**
 - `eleven_multilingual_v2` with `voice_settings: { stability, similarity_boost, style, use_speaker_boost }` — 402 Payment Required on the free plan.
-- `output_format: "mp3_44100_128"` — also 402; free plan only supports `mp3_44100_64`. Fixed in follow-up commit.
+- `output_format: "mp3_44100_128"` — incorrectly blamed for second 402; restored. Original 402 cause was solely `eleven_multilingual_v2`.
 
 ---
 
