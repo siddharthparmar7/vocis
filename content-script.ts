@@ -73,10 +73,15 @@ function startSpeech(lang: string) {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const recog = new Ctor() as any;
   recog.lang = lang;
-  recog.interimResults = false;
-  recog.onresult = (e: { results: { 0: { 0: { transcript: string } } } }) => {
-    const transcript = e.results[0][0].transcript;
-    chrome.runtime.sendMessage({ type: "SPEECH_RESULT", transcript }).catch(() => {});
+  recog.interimResults = true;
+  recog.onresult = (e: any) => {
+    const result = e.results[e.results.length - 1];
+    const transcript = result[0].transcript;
+    if (result.isFinal) {
+      chrome.runtime.sendMessage({ type: "SPEECH_RESULT", transcript }).catch(() => {});
+    } else {
+      chrome.runtime.sendMessage({ type: "SPEECH_INTERIM", transcript }).catch(() => {});
+    }
   };
   recog.onerror = (e: { error: string }) => {
     chrome.runtime.sendMessage({ type: "SPEECH_ERROR", error: e.error }).catch(() => {});
