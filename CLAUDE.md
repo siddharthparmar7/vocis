@@ -44,6 +44,9 @@ types.ts                Shared types: ExtractedPage, ChatMessage, MessageRequest
 vite.config.ts          Build config (vite-plugin-web-extension)
 tailwind.config.js      Tailwind v3, scoped to sidebar/**
 docs/PROGRESS.md        Living log of what has been implemented, decisions made, and bugs fixed
+README.md               User-facing setup guide (install, API keys, spending limits, security note)
+.env.example            Documents VITE_* key shapes — vars not read at runtime after env fallback removal
+docs/superpowers/specs/ Design specs from brainstorming sessions
 
 sidebar/
   App.tsx               Root component, voice state, settings toggle
@@ -92,6 +95,10 @@ All logs are prefixed for easy filtering:
 | `[Vocis:content]` | Page DevTools console |
 | `[Vocis:narrator]` | Sidebar DevTools (right-click sidebar → Inspect) |
 | `[Vocis:chat]` | Sidebar DevTools |
+
+## Gotcha: file searches
+
+- `Glob("**/*.md")` returns hundreds of node_modules results and truncates — use `find . -name "*.md" | grep -v node_modules` for markdown file searches
 
 ## Known Constraints
 
