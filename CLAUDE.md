@@ -53,7 +53,7 @@ sidebar/
   NarratorPanel.tsx     Play/pause/stop UI, voice picker
   ChatPanel.tsx         Message thread, text + voice input
   SettingsPanel.tsx     API key entry form
-  usePageContent.ts     Fetches extracted page from background
+  usePageContent.ts     Fetches extracted page from background; accepts `{ enabled?: boolean }` — pass `enabled={keysSet}` from App.tsx
   useKeyStatus.ts       Reads chrome.storage.local for key presence; drives first-run gate
   useNarrator.ts        IDLE→LOADING→PLAYING→PAUSED state machine
   useChat.ts            Chat history, sends/receives messages + audio
@@ -69,7 +69,7 @@ All sidebar→background communication uses `chrome.runtime.sendMessage`:
 |---|---|---|
 | `GET_PAGE_CONTENT` | — | `{ success, data: ExtractedPage }` |
 | `NARRATE` | `{ page, voice }` | `{ success, data: { audioBase64 } }` |
-| `CHAT` | `{ page, history, userMessage, voice }` | `{ success, data: { text, audioBuffer } }` |
+| `CHAT` | `{ page, history, userMessage, voice }` | `{ success, data: { text, audioBase64 } }` |
 | `GET_VOICES` | — | `{ success, data: Voice[] }` |
 | `SET_KEYS` | `{ claudeKey, elevenLabsKey }` | `{ success }` |
 
@@ -100,6 +100,10 @@ All logs are prefixed for easy filtering:
 ## Gotcha: file searches
 
 - `Glob("**/*.md")` returns hundreds of node_modules results and truncates — use `find . -name "*.md" | grep -v node_modules` for markdown file searches
+
+## Gotcha: hooks with an `enabled` flag
+
+- If a hook gates a `useEffect` on `enabled`, `enabled` **must** be in the dep array — omitting it means the effect never re-fires when `enabled` flips `false → true` (e.g. after first-run key entry)
 
 ## Known Constraints
 
