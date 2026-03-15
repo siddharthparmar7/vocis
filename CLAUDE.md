@@ -54,6 +54,7 @@ sidebar/
   ChatPanel.tsx         Message thread, text + voice input
   SettingsPanel.tsx     API key entry form
   usePageContent.ts     Fetches extracted page from background
+  useKeyStatus.ts       Reads chrome.storage.local for key presence; drives first-run gate
   useNarrator.ts        IDLE→LOADING→PLAYING→PAUSED state machine
   useChat.ts            Chat history, sends/receives messages + audio
   main.tsx              React entry point
