@@ -49,13 +49,8 @@ chrome.action.onClicked.addListener((tab) => {
 
 async function getKeys(): Promise<{ claudeKey: string; elevenLabsKey: string }> {
   const result = await chrome.storage.local.get(["claudeKey", "elevenLabsKey"]);
-  // Fall back to build-time env vars (from .env via Vite) if not set in storage
-  const claudeKey: string = (result.claudeKey as string | undefined)
-    || import.meta.env.VITE_CLAUDE_API_KEY
-    || "";
-  const elevenLabsKey: string = (result.elevenLabsKey as string | undefined)
-    || import.meta.env.VITE_ELEVENLABS_API_KEY
-    || "";
+  const claudeKey: string = (result.claudeKey as string | undefined) ?? "";
+  const elevenLabsKey: string = (result.elevenLabsKey as string | undefined) ?? "";
   log("Keys resolved — claude:", claudeKey ? `set (${claudeKey.slice(0, 10)}...)` : "MISSING",
     "| elevenlabs:", elevenLabsKey ? `set (${elevenLabsKey.slice(0, 8)}...)` : "MISSING");
   return { claudeKey, elevenLabsKey };
