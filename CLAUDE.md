@@ -30,9 +30,9 @@ sidebar/            — React UI, communicates with background via chrome.runtim
 
 **Key rules:**
 - `background.ts` is the **only** file that imports `@anthropic-ai/sdk` or `elevenlabs`
-- API keys are stored in `chrome.storage.local`, never in code or .env
-- Sidebar hooks are the **only** layer that calls `chrome.runtime.sendMessage`
-- Components are pure UI — no chrome APIs, no API calls
+- API keys are stored in `chrome.storage.local`, never in code or `.env`
+- Sidebar hooks are the **only** layer that calls `chrome.runtime.sendMessage` — exception: `SettingsPanel.tsx` calls `SET_KEYS` directly (intentional, no hook needed for a one-off save)
+- Components are pure UI — no chrome APIs, no API calls (see exception above)
 
 ## File Map
 
@@ -64,16 +64,23 @@ All sidebar→background communication uses `chrome.runtime.sendMessage`:
 | type | payload | response |
 |---|---|---|
 | `GET_PAGE_CONTENT` | — | `{ success, data: ExtractedPage }` |
-| `NARRATE` | `{ page, voice }` | `{ success, data: { audioBuffer } }` |
+| `NARRATE` | `{ page, voice }` | `{ success, data: { audioBase64 } }` |
 | `CHAT` | `{ page, history, userMessage, voice }` | `{ success, data: { text, audioBuffer } }` |
 | `GET_VOICES` | — | `{ success, data: Voice[] }` |
 | `SET_KEYS` | `{ claudeKey, elevenLabsKey }` | `{ success }` |
 
 Content script injection is **dynamic** — background injects `content-script.js` via `chrome.scripting.executeScript` on first `GET_PAGE_CONTENT` request (ping/inject pattern).
 
+## Storage Areas
+
+| Area | Keys | Used for |
+|---|---|---|
+| `chrome.storage.local` | `claudeKey`, `elevenLabsKey` | API keys — device-only, never synced |
+| `chrome.storage.sync` | `selectedVoice` | User preferences — syncs across Chrome profiles |
+
 ## API Keys
 
-Keys are entered by the user via the ⚙ settings panel in the sidebar. They are sent to the background via `SET_KEYS` and stored in `chrome.storage.local`. Never hardcode keys.
+Keys are entered via the Settings panel on first open (first-run gate) or via the ⚙ gear icon. They are sent to the background via `SET_KEYS` and stored in `chrome.storage.local`. Never hardcode keys or read from `.env` at runtime.
 
 ## Logging
 
