@@ -2,12 +2,13 @@ import { useState, useEffect, useCallback } from "react";
 import type { ExtractedPage } from "../types";
 
 type State =
+  | { status: "idle" }
   | { status: "loading" }
   | { status: "ready"; page: ExtractedPage }
   | { status: "error"; message: string };
 
-export function usePageContent() {
-  const [state, setState] = useState<State>({ status: "loading" });
+export function usePageContent({ enabled = true }: { enabled?: boolean } = {}) {
+  const [state, setState] = useState<State>({ status: "idle" });
 
   const load = useCallback(async () => {
     console.log("[Vocis] usePageContent: requesting page content");
@@ -22,7 +23,14 @@ export function usePageContent() {
     }
   }, []);
 
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => {
+    if (!enabled) return;
+    load();
+  }, [enabled, load]);
+
+  if (!enabled) {
+    return { page: null, loading: false, error: null, refresh: load };
+  }
 
   return {
     page: state.status === "ready" ? state.page : null,
