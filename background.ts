@@ -93,11 +93,20 @@ async function synthesizeSpeech(text: string, voiceId: string, elevenLabsKey: st
   // convert() returns a stream.Readable per types, but in a Chrome extension service worker
   // (browser runtime) the underlying fetch returns a Web ReadableStream which supports
   // async iteration. We cast to AsyncIterable to consume it generically.
-  const audioStream = await client.textToSpeech.convert(voiceId, {
-    text,
-    model_id: "eleven_turbo_v2",
-    output_format: "mp3_44100_128",
-  });
+  let audioStream;
+  try {
+    audioStream = await client.textToSpeech.convert(voiceId, {
+      text,
+      model_id: "eleven_turbo_v2",
+      output_format: "mp3_44100_64",
+    });
+  } catch (e) {
+    const msg = String(e);
+    if (msg.includes("402") || msg.includes("Status code: 402")) {
+      throw new Error("ElevenLabs billing error — check your account credits or plan limits at elevenlabs.io/app/subscription");
+    }
+    throw e;
+  }
   const iterable = audioStream as unknown as AsyncIterable<Uint8Array>;
   const chunks: Uint8Array[] = [];
   for await (const chunk of iterable) {

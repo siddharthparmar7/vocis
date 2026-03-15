@@ -176,3 +176,15 @@ Also fixed a latent architecture issue in the CHAT handler in `background.ts`: t
 - Pre-existing TypeScript error: `Array.at()` on `number[]` in `ChatPanel.tsx` — fixed by bumping `tsconfig.json` lib from `["ES2020", "DOM"]` to `["ES2022", "DOM"]`.
 
 **What was tried and didn't work:** N/A
+
+---
+
+### 2026-03-15 — Fix: ElevenLabs 402 on narration + user-friendly error
+
+**What was built:** Changed `output_format` from `mp3_44100_128` back to `mp3_44100_64` in `synthesizeSpeech`. Added 402-specific error catch that throws a readable message ("ElevenLabs billing error — check your account credits or plan limits at elevenlabs.io/app/subscription") instead of the raw SDK exception string.
+
+**Key decisions:** `mp3_44100_128` requires a paid ElevenLabs plan; `mp3_44100_64` works on the free tier. The 128kbps format was restored in commit `43ea224` after being incorrectly cleared as a cause — it is the cause.
+
+**Bugs / gotchas:** The raw SDK exception serializes as a minified class name (`mU: Status code: 402`) which is not actionable for the user. The 402 catch wraps only the `textToSpeech.convert` call so other errors still propagate as-is.
+
+**What was tried and didn't work:** `mp3_44100_128` — requires paid ElevenLabs plan (HTTP 402).
