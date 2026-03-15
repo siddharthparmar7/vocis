@@ -151,3 +151,28 @@ Also fixed a latent architecture issue in the CHAT handler in `background.ts`: t
 **Bugs / gotchas:** None anticipated.
 
 **What was tried and didn't work:** N/A (include root cause if known; use N/A if nothing failed)
+
+---
+
+### 2026-03-15 — Friend distribution & per-user key setup
+
+**What was built:** Full first-run onboarding flow so friends can clone the repo and use the extension with their own API keys. Six changes:
+
+1. **Stripped VITE_* env var fallback** from `background.ts` `getKeys()`. Keys now come from `chrome.storage.local` only. Vite still injects the vars if a `.env` file is present, but they are never read.
+2. **`usePageContent` `enabled` param** — new optional `enabled?: boolean` param; when false the hook returns `{ page: null, loading: false, error: null }` immediately and skips `GET_PAGE_CONTENT`. `enabled` is in the `useEffect` dep array so the hook fires when it flips `false → true` after first-run key entry.
+3. **`useKeyStatus` hook** — reads `chrome.storage.local` for `claudeKey` / `elevenLabsKey` on mount. Returns `{ keysSet, keysLoading, claudeKey, elevenLabsKey, refresh }`. Pull-only (no `storage.onChanged`). `keysLoading` (not `loading`) to avoid naming collision in `App.tsx`.
+4. **`SettingsPanel` redesign** — new optional props: `firstRun?`, `onSaved?`, `onClose?`, `claudeKey?`, `elevenLabsKey?`. First-run mode shows "Welcome to Vocis", hides Cancel, calls `onSaved?.()` on success. Normal mode shows 1500ms "✓ Saved" badge then calls `onSaved?.()` and `onClose?.()`. Per-field helper text with links to API key pages. Inline validation (Claude key must start with `sk-ant-`; ElevenLabs key must be non-empty). `sendMessage` wrapped in try/catch — throw treated same as failure response.
+5. **App.tsx first-run gate** — spinner while `keysLoading`, first-run `SettingsPanel` when `!keysSet`, normal UI when `keysSet`. `usePageContent` passed `enabled={keysSet}`. Gear-icon `SettingsPanel` receives `claudeKey`/`elevenLabsKey` props and `onSaved={refresh}`.
+6. **README + .env.example** — Prerequisites updated to Node.js ≥ 18; first-run key entry instructions replace old gear-icon steps; new Spending Limits and Security sections added. `.env.example` rewritten to clarify vars are no longer read at runtime.
+
+**Key decisions:**
+- `chrome.storage.local` for API keys (device-only, no cross-device sync); `chrome.storage.sync` for user preferences (selectedVoice). Documented in CLAUDE.md Storage Areas table.
+- First-run gate uses `keysLoading: true` on initial render to avoid a flash of SettingsPanel before storage is read.
+- `useEffect` dep array in `usePageContent` must include `enabled` — without it, the hook never fires after first-run key entry when `enabled` flips from `false` to `true`.
+- All `SettingsPanel` props are optional so `onClose` can be omitted in first-run mode without a runtime error.
+
+**Bugs / gotchas:**
+- `onSaved?.()` was initially missing from the normal-mode (gear-icon) save path — only called in the first-run branch. Fixed: `onSaved?.()` now called inside the 1500ms `setTimeout` callback alongside `onClose?.()`.
+- Pre-existing TypeScript error: `Array.at()` on `number[]` in `ChatPanel.tsx` — fixed by bumping `tsconfig.json` lib from `["ES2020", "DOM"]` to `["ES2022", "DOM"]`.
+
+**What was tried and didn't work:** N/A

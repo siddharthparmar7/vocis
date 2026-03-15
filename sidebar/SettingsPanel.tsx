@@ -63,6 +63,7 @@ export function SettingsPanel({
           setSaved(true);
           timerRef.current = setTimeout(() => {
             setSaved(false);
+            onSaved?.();
             onClose?.();
           }, 1500);
         }

@@ -28,7 +28,7 @@ The extension runs as a Chrome side panel. When you open it on any page:
 
 ## Setup
 
-**Prerequisites:** Node.js, a Chromium-based browser (Chrome, Arc, Brave, etc.)
+**Prerequisites:** Node.js ≥ 18, a Chromium-based browser (Chrome, Arc, Brave, etc.)
 
 ```bash
 git clone https://github.com/siddharthparmar7/vocis.git
@@ -45,9 +45,18 @@ Load the extension:
 
 Enter your API keys:
 
-1. Click the Vocis icon in the toolbar to open the side panel
-2. Click the gear icon (⚙) in the top-right corner
-3. Paste your **Anthropic API key** and **ElevenLabs API key**, then click Save
+The extension will prompt you for your API keys the first time you open it. Paste your Anthropic key and ElevenLabs key and click Save.
+
+## Spending limits
+
+Both APIs charge per use. We recommend setting monthly budget limits so you don't get surprised:
+
+- **Anthropic:** [console.anthropic.com/settings/limits](https://console.anthropic.com/settings/limits)
+- **ElevenLabs:** [elevenlabs.io/app/subscription](https://elevenlabs.io/app/subscription)
+
+## Security
+
+Your API keys are stored locally in your browser's extension storage. They are not sent to any server we control and are not accessible to websites you visit. They are not encrypted on disk — anyone with access to your machine's Chrome profile directory can read them. We plan to improve this in a future version.
 
 ## Development
 
